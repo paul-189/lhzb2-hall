@@ -10,6 +10,9 @@ on:
       - "hall/apply_hall_api_v2.py"
       - ".github/workflows/build-wasm.yml"
 
+permissions:
+  contents: write      # 发布 Release 资产需要（上一轮就是这里 403：Resource not accessible by integration）
+
 env:
   MAME_VER: mame0289
   SUBTARGET: lhzb2hall
