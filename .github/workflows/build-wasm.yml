@@ -58,7 +58,8 @@ jobs:
       - name: 编译 wasm 核心（只含这一族驱动）
         env:
           # 导出 JS 需要的运行期方法：写 ROM 进虚拟文件系统(FS)、自控启动参数(callMain)、内存视图
-          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,callMain,HEAPU8,HEAP8,stackAlloc,stringToUTF8,UTF8ToString"
+          # 只在链接期有意义；编译期会被忽略并告警，而 MAME 开 -Werror ⇒ 必须压掉那一条
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,callMain,HEAPU8,HEAP8,stackAlloc,stringToUTF8,UTF8ToString -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument"
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
