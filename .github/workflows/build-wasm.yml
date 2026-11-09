@@ -59,7 +59,9 @@ jobs:
         env:
           # 导出 JS 需要的运行期方法：写 ROM 进虚拟文件系统(FS)、自控启动参数(callMain)、内存视图
           # 只在链接期有意义；编译期会被忽略并告警，而 MAME 开 -Werror ⇒ 必须压掉那一条
-          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,callMain,HEAPU8,HEAP8,stackAlloc,stringToUTF8,UTF8ToString -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument"
+          # =all：只加不减。上一版列白名单把 MAME 胶水自己依赖的 Module.cwrap 挤掉了
+          # （页面报 "Module.cwrap is not a function"），=all 保留官方默认导出
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=all -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument"
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
