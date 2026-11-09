@@ -56,9 +56,13 @@ jobs:
           embuilder build sdl3 sdl3_ttf
 
       - name: 编译 wasm 核心（只含这一族驱动）
+        env:
+          # 导出 JS 需要的运行期方法：写 ROM 进虚拟文件系统(FS)、自控启动参数(callMain)、内存视图
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,callMain,HEAPU8,HEAP8,stackAlloc,stringToUTF8,UTF8ToString"
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
+          echo "EMCC_CFLAGS=$EMCC_CFLAGS"
           cd mame
           emmake make SUBTARGET=${SUBTARGET} \
             SOURCES=src/mame/igs/igs017.cpp \
