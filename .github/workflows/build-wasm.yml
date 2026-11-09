@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "hall/apply_hall_api_v4.py"
+      - "hall/apply_hall_api_v6.py"
       - ".github/workflows/build-wasm.yml"
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
           set -e
           cp mame/src/mame/igs/igs017.cpp mame/src/mame/igs/igs017.cpp.orig
           cd mame
-          python3 ../hall/apply_hall_api_v4.py
+          python3 ../hall/apply_hall_api_v6.py
           diff -u src/mame/igs/igs017.cpp.orig src/mame/igs/igs017.cpp | head -60 || true
 
       - name: 装 Emscripten（官方要求 6.0.2+）
