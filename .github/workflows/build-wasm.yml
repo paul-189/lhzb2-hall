@@ -62,7 +62,9 @@ jobs:
           # =all：只加不减。上一版列白名单把 MAME 胶水自己依赖的 Module.cwrap 挤掉了
           # （页面报 "Module.cwrap is not a function"），=all 保留官方默认导出
           # 必须含 cwrap：实测胶水自己调用 Module.cwrap 13 次（=all 这版不认，白名单漏 cwrap 也会崩）
-          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument"
+          # LEGACY_GL_EMULATION：MAME 渲染器用 GL1.1 固定管线（实测链接期报 glShadeModel/glColor4f/glVertex2f
+          # 未定义，页面 abort(missing function: glShadeModel)；-video soft/bgfx 都被 OSD 拒 "Unknown system"
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument"
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
