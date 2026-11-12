@@ -40,12 +40,18 @@ for name, a in (("A1", A1), ("A2", A2)):
 INS1 = """
 	// ===== hall api (added by hall/apply_outzone_api.py) =====
 public:
+	ioport_port *hall_find_port(const char *tag)
+	{
+		const ioport_list &list = machine().ioport().ports();
+		auto it = list.find(tag);
+		return (it != list.end()) ? it->second.get() : nullptr;
+	}
 	// port: 0=P1  1=P2  2=SYSTEM；mask=字段掩码；val=字段逻辑值(0/1)
 	bool hall_field(int port, u8 mask, s32 val)
 	{
 		static const char *names[] = { "P1", "P2", "SYSTEM" };
 		if (port < 0 || port > 2) return false;
-		ioport_port *p = machine().ioport().port(names[port]);
+		ioport_port *p = hall_find_port(names[port]);
 		if (!p) return false;
 		ioport_field *f = p->field(mask);
 		if (!f) return false;
@@ -56,7 +62,7 @@ public:
 	{
 		static const char *names[] = { "P1", "P2", "SYSTEM" };
 		if (port < 0 || port > 2) return -1;
-		ioport_port *p = machine().ioport().port(names[port]);
+		ioport_port *p = hall_find_port(names[port]);
 		return p ? int(p->read()) : -1;
 	}
 	int hall_coin_count() { return machine().bookkeeping().coin_counter_get_count(0); }
