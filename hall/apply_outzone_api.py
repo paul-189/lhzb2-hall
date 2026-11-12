@@ -45,7 +45,7 @@ public:
 	{
 		static const char *names[] = { "P1", "P2", "SYSTEM" };
 		if (port < 0 || port > 2) return false;
-		ioport_port *p = machine().ioport(names[port]);
+		ioport_port *p = machine().ioport().port(names[port]);
 		if (!p) return false;
 		ioport_field *f = p->field(mask);
 		if (!f) return false;
@@ -56,7 +56,7 @@ public:
 	{
 		static const char *names[] = { "P1", "P2", "SYSTEM" };
 		if (port < 0 || port > 2) return -1;
-		ioport_port *p = machine().ioport(names[port]);
+		ioport_port *p = machine().ioport().port(names[port]);
 		return p ? int(p->read()) : -1;
 	}
 	int hall_coin_count() { return machine().bookkeeping().coin_counter_get_count(0); }
