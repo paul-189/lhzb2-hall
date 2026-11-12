@@ -93,11 +93,15 @@ int toaplan1_state::hall_frame_capture()
 	screen_bitmap &cb = m_screen->curbitmap();
 	if (cb.format() != BITMAP_FORMAT_RGB32) return -2;
 	bitmap_rgb32 &bm = cb.as_rgb32();
-	const int w = bm.width(), h = bm.height();
+	// set_raw 的位图含消隐期（450x282），只裁可见区 320x240（screen.h:191 visible_area）
+	const rectangle &vis = m_screen->visible_area();
+	const int x0 = vis.left(), y0 = vis.top();
+	const int w = vis.width(), h = vis.height();
 	if (w <= 0 || h <= 0 || w * h > 320 * 240) return -3;
+	if (x0 < 0 || y0 < 0 || x0 + w > bm.width() || y0 + h > bm.height()) return -4;
 	for (int y = 0; y < h; y++)
 	{
-		const u32 *row = &bm.pix(y, 0);
+		const u32 *row = &bm.pix(y0 + y, x0);
 		u32 *out = s_frame_buf + y * w;
 		for (int x = 0; x < w; x++)
 		{
@@ -122,6 +126,44 @@ EMSCRIPTEN_KEEPALIVE u32 hall_frame_ptr() { return (u32)(uintptr_t)toaplan1_stat
 EMSCRIPTEN_KEEPALIVE int hall_frame_w() { return toaplan1_state::s_frame_w; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_h() { return toaplan1_state::s_frame_h; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_number() { return toaplan1_state::s_hall ? (int)toaplan1_state::s_hall->hall_frame_number() : -1; }
+
+// ---- 运行时诊断（临时，定位 hall_find_port 失败）----
+EMSCRIPTEN_KEEPALIVE int hall_port_count()
+{
+	if (!toaplan1_state::s_hall) return -1;
+	return (int)toaplan1_state::s_hall->machine().ioport().ports().size();
+}
+EMSCRIPTEN_KEEPALIVE int hall_port_find(int which)
+{
+	if (!toaplan1_state::s_hall) return -1;
+	static const char *names[] = { "P1", "P2", "SYSTEM", "VBLANK", "DSWA", "DSWB" };
+	if (which < 0 || which > 5) return -2;
+	const ioport_list &list = toaplan1_state::s_hall->machine().ioport().ports();
+	auto it1 = list.find(names[which]);                 // const char* 透明查找
+	auto it2 = list.find(std::string(names[which]));    // std::string 查找
+	int r = (it1 != list.end()) ? 1 : 0;
+	r |= ((it2 != list.end()) ? 1 : 0) << 2;
+	return r;   // bit0=char*命中 bit2=string命中
+}
+EMSCRIPTEN_KEEPALIVE int hall_port_tag(int index)
+{
+	if (!toaplan1_state::s_hall) return -1;
+	const ioport_list &list = toaplan1_state::s_hall->machine().ioport().ports();
+	int i = 0;
+	for (const auto &kv : list)
+	{
+		if (i++ == index)
+		{
+			const std::string &tag = kv.first;
+			int n = (int)tag.size(); if (n > 60) n = 60;
+			char *out = (char *)toaplan1_state::s_frame_buf;
+			for (int k = 0; k < n; k++) out[k] = tag[k];
+			out[n] = 0;
+			return n;
+		}
+	}
+	return -2;
+}
 }
 // ===== hall api end =====
 """
