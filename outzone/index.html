@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Out Zone · 真 MAME 可玩（A 路纯 CPU 出画）</title>
+<style>
+:root{
+  --bg:#0a0c14; --panel:#121627; --panel-d:#0c0f1c; --line:#2a3352;
+  --red:#c22730; --red-d:#7a1216; --gold:#e9b949; --gold-hi:#ffd97a;
+  --cream:#f3e9d2; --dim:#9aa3c0; --led:#ffcf4d; --cyan:#57d7e3;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--cream);
+  font:14px/1.45 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #1a245055, transparent 60%),
+    radial-gradient(900px 500px at 85% 110%, #c2273022, transparent 60%),
+    repeating-linear-gradient(45deg, #ffffff03 0 2px, transparent 2px 6px),
+    var(--bg);
+  display:flex;flex-direction:column;overflow:hidden}
+/* ── 机台顶棚 ── */
+.marquee{flex:0 0 auto;display:flex;align-items:center;gap:16px;
+  padding:10px 20px 12px;position:relative;
+  background:linear-gradient(180deg,#2a3a7a,#1a2450 45%,#10163a);
+  border-bottom:3px solid var(--gold);box-shadow:0 6px 24px #0009}
+.marquee::before{content:"";position:absolute;left:0;right:0;top:3px;height:5px;
+  background:repeating-linear-gradient(90deg,var(--gold-hi) 0 5px,transparent 5px 22px);
+  opacity:.85;border-radius:3px}
+.mtitle{font-family:Impact,"Arial Black","Microsoft YaHei",sans-serif;font-weight:700;
+  font-size:34px;letter-spacing:6px;color:var(--gold-hi);
+  text-shadow:0 2px 0 #0a0f2a,0 0 18px #ffd97a66;margin-top:4px}
+.msub{font-size:12px;color:#f3e9d2cc;letter-spacing:2px;margin-top:4px}
+.mright{margin-left:auto;display:flex;align-items:center;gap:12px;margin-top:4px}
+.lamp{width:12px;height:12px;border-radius:50%;background:#5a5a5a;box-shadow:0 0 0 2px #0004}
+.lamp.on{background:#57e389;box-shadow:0 0 10px #57e389,0 0 0 2px #0004}
+#phase{font-size:15px;font-weight:700;letter-spacing:2px;color:var(--cream)}
+/* ── 主区 ── */
+main{flex:1 1 auto;display:flex;gap:16px;padding:14px 16px;min-height:0}
+.stage{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0;justify-content:center}
+.bezel{position:relative;flex:0 0 auto;width:min(100%, calc((100vh - 250px) * 240 / 320));
+  aspect-ratio:240/320;margin:0 auto;background:#000;
+  border:10px solid #14101c;border-radius:10px;
+  box-shadow:0 0 0 2px var(--gold) inset,0 14px 40px #000c,0 0 60px #1a245088;
+  overflow:hidden}
+canvas#canvas{display:block;width:100%;height:100%;image-rendering:pixelated;background:#000}
+.scan{position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,#0000 0 3px,#00000014 3px 4px)}
+.leds{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.led{background:#0a0f1c;border:1px solid var(--line);border-radius:6px;
+  padding:5px 14px;text-align:center;min-width:96px}
+.led .k{font-size:11px;color:var(--dim);letter-spacing:2px}
+.led .v{font:700 22px/1.25 Consolas,"Courier New",monospace;color:var(--led);
+  text-shadow:0 0 8px #ffcf4d55}
+.led.flash .v{animation:ledflash .5s}
+@keyframes ledflash{0%{color:#fff;text-shadow:0 0 16px #fff}100%{color:var(--led)}}
+/* ── 控制台 ── */
+.deck{flex:0 0 348px;display:flex;flex-direction:column;gap:12px;overflow:auto;min-height:0}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel-d));border:1px solid var(--line);
+  border-radius:10px;padding:12px 14px;box-shadow:0 6px 18px #0006}
+.card h3{margin:0 0 10px;font-size:13px;letter-spacing:3px;color:var(--gold);
+  font-weight:700;border-bottom:1px dashed #2a335288;padding-bottom:6px}
+.abtns{display:flex;justify-content:space-around;gap:8px}
+.ab{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;
+  cursor:pointer;padding:0;color:var(--cream)}
+.ab .cap{width:88px;height:88px;border-radius:50%;position:relative;
+  display:flex;align-items:center;justify-content:center;
+  font:700 22px/1 KaiTi,STKaiti,"Microsoft YaHei",serif;letter-spacing:2px;color:#fff;
+  text-shadow:0 1px 2px #0008;transition:transform .06s,box-shadow .06s;
+  box-shadow:0 7px 0 #0007,0 10px 18px #0008,0 0 0 4px #101018}
+.ab .cap::after{content:"";position:absolute;left:14%;top:9%;width:72%;height:38%;
+  border-radius:50%;background:linear-gradient(180deg,#ffffff55,#ffffff00)}
+.ab.coin .cap{background:radial-gradient(circle at 35% 30%,#e0454e,var(--red) 60%,var(--red-d))}
+.ab.start .cap{background:radial-gradient(circle at 35% 30%,#5fd68a,#1f8a4c 60%,#115c31)}
+.ab.shot .cap{background:radial-gradient(circle at 35% 30%,#ffd97a,#cf9a2c 60%,#8a611a)}
+.ab.bomb .cap{background:radial-gradient(circle at 35% 30%,#7fb2ff,#2f5fc4 60%,#1a3a80)}
+.ab.btn3 .cap{background:radial-gradient(circle at 35% 30%,#e39aff,#9a3fc4 60%,#5c1a80)}
+.ab:active .cap,.ab.pressed .cap{transform:translateY(5px);box-shadow:0 2px 0 #0007,0 4px 10px #0008,0 0 0 4px #101018}
+.ab .lb{font-size:12px;color:var(--dim);letter-spacing:1px}
+.ab:disabled{opacity:.45;cursor:not-allowed}
+/* 方向盘 */
+.dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:252px;margin:0 auto}
+.dp{height:72px;border-radius:8px;border:1px solid #3a4a7a;cursor:pointer;
+  background:linear-gradient(180deg,#1e2a52,#141c3a);color:var(--cream);
+  font-size:30px;line-height:1;display:flex;align-items:center;justify-content:center;
+  transition:transform .05s,background .1s;user-select:none;touch-action:none}
+.dp:hover{background:linear-gradient(180deg,#2a3a6e,#1a2450)}
+.dp:active,.dp.pressed{transform:translateY(2px);background:#0c1226;border-color:var(--gold)}
+.dp.mid{background:none;border:none;cursor:default;color:#3a4a7a;font-size:20px}
+.dp:disabled{opacity:.45;cursor:not-allowed}
+.hint{font-size:12px;color:var(--dim);margin-top:8px}
+.hint b{color:var(--gold)}
+.row{display:flex;gap:8px;align-items:center}
+.mini{font-size:12px;color:var(--dim);background:#0c1226;border:1px solid var(--line);
+  border-radius:6px;padding:6px 10px;cursor:pointer}
+.mini:hover{color:var(--cream);border-color:var(--gold)}
+details.diag{background:#0a0f1c;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+details.diag summary{cursor:pointer;font-size:12px;color:var(--dim);letter-spacing:2px}
+#log{white-space:pre-wrap;background:#070b14;border:1px solid #1a2440;border-radius:6px;
+  padding:8px;height:150px;overflow:auto;font:12px/1.5 Consolas,monospace;color:#8fa0c0;margin-top:6px}
+footer{flex:0 0 auto;display:flex;gap:14px;align-items:center;padding:7px 18px;
+  border-top:1px solid #1a2440;font-size:12px;color:#6f7f9e;background:#080b14}
+footer .sp{margin-left:auto}
+@media (max-width:980px){
+  body{overflow:auto}
+  main{flex:0 0 auto;flex-direction:column}
+  .stage{flex:0 0 auto}
+  .deck{flex:0 0 auto;width:100%}
+  .bezel{width:100%}
+  .mtitle{font-size:26px;letter-spacing:3px}
+}
+</style></head><body>
+
+<div class="marquee">
+  <div>
+    <div class="mtitle">OUT ZONE</div>
+    <div class="msub">Toaplan 1990 竖屏射击 · MAME 0.289 WASM · A 路纯 CPU 出画</div>
+  </div>
+  <div class="mright"><span class="lamp" id="lamp"></span><span id="phase">启动中…</span></div>
+</div>
+
+<main>
+  <div class="stage">
+    <div class="bezel">
+      <canvas id="canvas" width="240" height="320"></canvas>
+      <div class="scan"></div>
+    </div>
+    <div class="leds">
+      <div class="led" id="ledCr"><div class="k">CREDIT 投币数</div><div class="v" id="hcr">—</div></div>
+      <div class="led"><div class="k">画面帧</div><div class="v" id="hfn">—</div></div>
+      <div class="led"><div class="k">FPS</div><div class="v" id="hfps">—</div></div>
+      <div class="led"><div class="k">P1 输入</div><div class="v" id="hp1">—</div></div>
+    </div>
+  </div>
+
+  <div class="deck">
+    <div class="card">
+      <h3>机 台</h3>
+      <div class="abtns">
+        <button class="ab coin" id="bCoin" disabled><span class="cap">币</span><span class="lb">投币 · 5</span></button>
+        <button class="ab start" id="bStart" disabled><span class="cap">开</span><span class="lb">开始 · Enter</span></button>
+      </div>
+      <div class="hint">先<b>投币</b>再<b>开始</b>。键盘：<b>5</b>=投币 · <b>Enter</b>=开始</div>
+    </div>
+    <div class="card">
+      <h3>方 向（按住移动）</h3>
+      <div class="dpad">
+        <button class="dp" data-d="5" disabled>↖</button>
+        <button class="dp" data-d="1" disabled>↑</button>
+        <button class="dp" data-d="9" disabled>↗</button>
+        <button class="dp" data-d="4" disabled>←</button>
+        <div class="dp mid">✛</div>
+        <button class="dp" data-d="8" disabled>→</button>
+        <button class="dp" data-d="6" disabled>↙</button>
+        <button class="dp" data-d="2" disabled>↓</button>
+        <button class="dp" data-d="10" disabled>↘</button>
+      </div>
+      <div class="hint">键盘：<b>方向键 / WASD</b>（斜向=两键同按）</div>
+    </div>
+    <div class="card">
+      <h3>武 器（按住连发）</h3>
+      <div class="abtns">
+        <button class="ab shot" id="bShot" disabled><span class="cap">射</span><span class="lb">射击 · Z/J</span></button>
+        <button class="ab bomb" id="bBomb" disabled><span class="cap">爆</span><span class="lb">炸弹 · X/K</span></button>
+        <button class="ab btn3" id="bBtn3" disabled><span class="cap">特</span><span class="lb">第三键 · C/L</span></button>
+      </div>
+      <div class="hint">射击按住即连发；炸弹清屏（有限）。</div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <button class="mini" id="bSound">🔊 音效开</button>
+        <button class="mini" id="bReset">⟳ 重开机</button>
+        <span class="hint" style="margin:0">卡住时点重开机</span>
+      </div>
+    </div>
+    <details class="diag" id="diag"><summary>运行日志 / 诊断</summary><div id="log"></div></details>
+  </div>
+</main>
+
+<footer>
+  <span>A 路：MAME 以 -video none 跑逻辑 · 驱动层 hall_frame_capture 导出 RGBA · 页面 2D 自绘（零 GL）· 竖屏 240×320</span>
+  <span class="sp" id="fenv"></span>
+</footer>
+
+<script>
+// ===== 宿主补丁（与 lhzb2 v23 生产壳完全一致）=====
+// ① crypto.getRandomValues 拒绝 resizable ArrayBufferView ⇒ 复制到普通 buffer 再写回
+(function () {
+  const orig = crypto.getRandomValues.bind(crypto);
+  crypto.getRandomValues = function (view) {
+    try { return orig(view); }
+    catch (e) {
+      const tmp = new Uint8Array(view.byteLength);
+      orig(tmp);
+      new Uint8Array(view.buffer, view.byteOffset, view.byteLength).set(tmp);
+      return view;
+    }
+  };
+})();
+// ①b TextDecoder/TextEncoder 同样拒绝 resizable ArrayBuffer（Edge 实测）
+(function () {
+  const origDecode = TextDecoder.prototype.decode;
+  TextDecoder.prototype.decode = function (input, options) {
+    try { return origDecode.call(this, input, options); }
+    catch (e) {
+      if (input && input.buffer) {
+        const copy = new Uint8Array(input.byteLength);
+        copy.set(new Uint8Array(input.buffer, input.byteOffset, input.byteLength));
+        return origDecode.call(this, copy, options);
+      }
+      throw e;
+    }
+  };
+  const origEnc = TextEncoder.prototype.encodeInto;
+  if (origEnc) TextEncoder.prototype.encodeInto = function (src, dest) {
+    try { return origEnc.call(this, src, dest); }
+    catch (e) {
+      if (dest && dest.buffer) {
+        const tmp = new Uint8Array(dest.byteLength);
+        const r = origEnc.call(this, src, tmp);
+        new Uint8Array(dest.buffer, dest.byteOffset, dest.byteLength).set(tmp.subarray(0, r.written));
+        return r;
+      }
+      throw e;
+    }
+  };
+})();
+// ② headless 页面 hidden ⇒ rAF 不跑 ⇒ 用 MessageChannel 顶替
+(function () {
+  const origRaf = window.requestAnimationFrame.bind(window);
+  let rafWorks = false;
+  origRaf(() => { rafWorks = true; });
+  const ch = new MessageChannel();
+  const pending = new Map();
+  let seq = 0;
+  ch.port1.onmessage = (ev) => {
+    const cb = pending.get(ev.data);
+    if (cb) { pending.delete(ev.data); cb(performance.now()); }
+  };
+  window.requestAnimationFrame = function (cb) {
+    if (rafWorks) return origRaf(cb);
+    const id = ++seq;
+    pending.set(id, cb);
+    ch.port2.postMessage(id);
+    return id;
+  };
+  const origCaf = window.cancelAnimationFrame.bind(window);
+  window.cancelAnimationFrame = function (id) {
+    if (pending.has(id)) { pending.delete(id); return; }
+    try { return origCaf(id); } catch (e) {}
+  };
+})();
+
+const LOG = document.getElementById('log');
+const DIAG = document.getElementById('diag');
+const L = m => { LOG.textContent += m + "\n"; LOG.scrollTop = LOG.scrollHeight; console.log("[oz] " + m); };
+window.addEventListener('error', e => { try { DIAG.open = true; L('✗ JS错误: ' + (e.message || e.type) + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno); } catch (_) {} });
+window.addEventListener('unhandledrejection', e => { try { DIAG.open = true; L('✗ Promise拒绝: ' + String((e.reason && e.reason.message) || e.reason).slice(0, 300)); } catch (_) {} });
+document.getElementById('fenv').textContent =
+  (navigator.userAgent.match(/Edg\/[\d.]+|Chrome\/[\d.]+/) || ['?'])[0] +
+  ' · DPR=' + window.devicePixelRatio + ' · deviceMemory=' + navigator.deviceMemory + 'GB';
+window.__result = { ok: false, err: null, data: {} };
+window.__frameStats = { draws: 0, lastRet: 0, w: 0, h: 0, fn: -1, fps: 0, nonBlack: 0, colors: 0 };
+window.__lastKey = null;
+
+/* ── 游戏声音（与 v23 生产壳同一管线：-sound js → jsmame_stream_sink_update → AudioWorklet）── */
+let sndOn = true;
+const GAME_SR = 48000;
+let gameAC = null, gameGain = null, gameSink = null, spNode = null;
+let gameAudioMode = null, audioInited = false, gameRatio = 1;
+let spQueue = [], spCur = null, spPos = 0;
+window.__audioCalls = 0; window.__audioSamples = 0;
+
+const WORKLET_SRC = `
+class MameSink extends AudioWorkletProcessor {
+  constructor(){
+    super();
+    this.q=[]; this.cur=null; this.pos=0;
+    this.port.onmessage=(e)=>{
+      const d=e.data;
+      if(d && d.cmd==='reset'){ this.q.length=0; this.cur=null; this.pos=0; return; }
+      if(d && d.l){
+        this.q.push(d);
+        let n=0; for(const c of this.q) n+=c.l.length;
+        const cap=sampleRate*0.5;
+        while(n>cap && this.q.length>1){ n-=this.q.shift().l.length; }
+      }
+    };
+  }
+  process(inputs, outputs){
+    const out=outputs[0]; const chL=out[0], chR=out[1]||out[0]; const n=chL.length;
+    for(let i=0;i<n;i++){
+      if(!this.cur || this.pos>=this.cur.l.length){ this.cur=this.q.length?this.q.shift():null; this.pos=0; }
+      if(this.cur){ chL[i]=this.cur.l[this.pos]; chR[i]=this.cur.r[this.pos]; this.pos++; }
+      else { chL[i]=0; chR[i]=0; }
+    }
+    return true;
+  }
+}
+registerProcessor('mame-sink', MameSink);
+`;
+
+async function initGameAudio(){
+  if(audioInited) return;
+  audioInited = true;
+  const ACtor = window.AudioContext || window.webkitAudioContext;
+  if(!ACtor){ L('浏览器无 WebAudio，游戏声音不可用'); return; }
+  try { gameAC = new ACtor({ sampleRate: GAME_SR }); }
+  catch(e){ gameAC = new ACtor(); }
+  gameRatio = GAME_SR / gameAC.sampleRate;
+  gameGain = gameAC.createGain();
+  gameGain.gain.value = sndOn ? 0.85 : 0;
+  gameGain.connect(gameAC.destination);
+  if(gameAC.audioWorklet){
+    try {
+      const url = URL.createObjectURL(new Blob([WORKLET_SRC], {type:'application/javascript'}));
+      await gameAC.audioWorklet.addModule(url);
+      gameSink = new AudioWorkletNode(gameAC, 'mame-sink', {outputChannelCount:[2]});
+      gameSink.connect(gameGain);
+      gameAudioMode = 'worklet';
+    } catch(e){ gameAudioMode = null; }
+  }
+  if(gameAudioMode !== 'worklet'){
+    spNode = gameAC.createScriptProcessor(2048, 0, 2);
+    spNode.onaudioprocess = (e)=>{
+      const outL=e.outputBuffer.getChannelData(0), outR=e.outputBuffer.getChannelData(1);
+      const n=outL.length;
+      for(let i=0;i<n;i++){
+        if(!spCur || spPos>=spCur.l.length){ spCur=spQueue.length?spQueue.shift():null; spPos=0; }
+        if(spCur){ outL[i]=spCur.l[spPos]; outR[i]=spCur.r[spPos]; spPos++; }
+        else { outL[i]=0; outR[i]=0; }
+      }
+    };
+    spNode.connect(gameGain);
+    gameAudioMode = 'script';
+  }
+  try { await gameAC.resume(); } catch(e){}
+  L('游戏声音就绪 · ' + gameAudioMode + ' · ' + gameAC.sampleRate + 'Hz');
+}
+
+window.jsmame_stream_sink_update = function(ptr, samples){
+  window.__audioCalls++;
+  if(!audioInited || !gameAC || gameAC.state !== 'running' || !sndOn || samples <= 0) return;
+  const heap = Module.HEAP16;
+  if(!heap) return;
+  const base = ptr >> 1;
+  window.__audioSamples += samples;
+  let outN, l, r;
+  if(gameRatio === 1){
+    outN = samples; l = new Float32Array(outN); r = new Float32Array(outN);
+    for(let i=0;i<samples;i++){ l[i]=heap[base+i*2]/32768; r[i]=heap[base+i*2+1]/32768; }
+  } else {
+    outN = Math.floor(samples/gameRatio); l = new Float32Array(outN); r = new Float32Array(outN);
+    for(let j=0;j<outN;j++){
+      const sp=j*gameRatio, i0=Math.floor(sp), f=sp-i0, i1=Math.min(i0+1,samples-1);
+      l[j]=(heap[base+i0*2]*(1-f)+heap[base+i1*2]*f)/32768;
+      r[j]=(heap[base+i0*2+1]*(1-f)+heap[base+i1*2+1]*f)/32768;
+    }
+  }
+  if(gameAudioMode === 'worklet' && gameSink){
+    gameSink.port.postMessage({l,r},[l.buffer,r.buffer]);
+  } else if(gameAudioMode === 'script'){
+    spQueue.push({l,r});
+    let n=0; for(const c of spQueue) n+=c.l.length;
+    const cap=gameAC.sampleRate*0.5;
+    while(n>cap && spQueue.length>1){ n-=spQueue.shift().l.length; }
+  }
+};
+
+function armGameAudio(){ initGameAudio(); }
+window.addEventListener('pointerdown', armGameAudio, {once:true});
+window.addEventListener('keydown', armGameAudio, {once:true});
+
+document.getElementById('bSound').onclick = function () {
+  sndOn = !sndOn; this.textContent = sndOn ? '🔊 音效开' : '🔇 音效关';
+  if (gameGain) gameGain.gain.value = sndOn ? 0.85 : 0;
+  if (sndOn) { initGameAudio(); if (gameAC) { try { gameAC.resume(); } catch(e){} } }
+};
+document.getElementById('bReset').onclick = () => location.reload();
+
+/* ── 键位（toaplipt.h 已核）──
+   P1(port 0): 0x01上 0x02下 0x04左 0x08右 | 0x10射击 0x20炸弹 0x40第三键
+   SYSTEM(port 2): 0x08投币 0x20开始 */
+const P1 = 0, SYS = 2;
+const M_UP = 1, M_DOWN = 2, M_LEFT = 4, M_RIGHT = 8;
+const M_SHOT = 0x10, M_BOMB = 0x20, M_BTN3 = 0x40;
+const M_COIN = 0x08, M_START = 0x20;
+let M = null;   // Module，init 后赋值
+
+function key(port, mask, val) {
+  if (!M || typeof M._hall_key !== 'function') return -1;
+  const ret = M._hall_key(port, mask, val);
+  window.__lastKey = { port, mask, val, ret };
+  return ret;
+}
+function pulse(port, mask, ms) {
+  key(port, mask, 1);
+  setTimeout(() => key(port, mask, 0), ms || 120);
+}
+// 方向：按位拆分（field 按精确掩码匹配，斜向必须拆成单方向两次调用）
+function dirBits(mask, val) {
+  for (const b of [M_UP, M_DOWN, M_LEFT, M_RIGHT])
+    if (mask & b) key(P1, b, val);
+}
+
+(async () => {
+ try {
+  L("拉取 ROM（outzonea 套装）…");
+  const resp = await fetch('../../_capture/roms/outzonea.zip');
+  if (!resp.ok) { DIAG.open = true; L("✗ ROM HTTP " + resp.status); return; }
+  const zip = new Uint8Array(await resp.arrayBuffer());
+  L("ROM " + zip.length + " 字节");
+
+  const cv = document.getElementById('canvas');
+  const ctx = cv.getContext('2d');
+  // 离屏：驱动原生 320×240 横位图；显示：旋转后 240×320 竖屏
+  const off = document.createElement('canvas');
+  off.width = 320; off.height = 240;
+  const offCtx = off.getContext('2d');
+  // ROT270（toaplan1.cpp outzone config）⇒ 显示 = 原图逆时针 90°（浏览器实测校准）
+  const ROT = 'ccw';
+
+  const Mod = {
+    canvas: cv,
+    print: s => L("[emu] " + s), printErr: s => L("[emu!] " + s),
+    onRuntimeInitialized: () => L("✓ wasm 运行时已初始化（编译完成）"),
+    preRun: [() => {
+      try { window.FS.mkdir('roms'); } catch (e) {}
+      window.FS.writeFile('roms/outzonea.zip', zip);
+      L("✓ preRun: ROM 已写入 FS roms/outzonea.zip (" + window.FS.stat('roms/outzonea.zip').size + " 字节)");
+    }]
+  };
+  Mod.arguments = ['outzonea','-rompath','roms','-nvram_directory','nvram','-cfg_directory','cfg',
+                   '-state_directory','sta','-skip_gameinfo','-sound','js','-samplerate','48000','-video','none'];
+  window.Module = Mod;
+
+  L("加载引擎 JS + wasm（编译需数秒）…");
+  await new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'outzone.js';
+    s.onload = res; s.onerror = () => rej(new Error("js 加载失败")); document.head.appendChild(s);
+  });
+  for (let i = 0; i < 300 && !window.FS; i++) await new Promise(z => setTimeout(z, 50));
+  if (!window.FS) { DIAG.open = true; L("✗ window.FS 未出现（15 秒超时）"); return; }
+  M = Mod;
+  L("FS 就绪，main 由 run() 自动启动，参数=" + JSON.stringify(Mod.arguments));
+  const has = k => { try { return typeof M['_' + k] === 'function'; } catch (e) { return false; } };
+  L("等待机器 init（hall_ready=1，最多 60 秒）…");
+  let readyAt = -1;
+  for (let i = 0; i < 240; i++) {
+    if (has('hall_ready')) { try { if (M._hall_ready() === 1) { readyAt = i; break; } } catch (e) {} }
+    if (i > 0 && i % 40 === 0) L("…仍在等待 hall_ready（已 " + (i * 0.25).toFixed(0) + " 秒）");
+    await new Promise(z => setTimeout(z, 250));
+  }
+  if (readyAt < 0) { DIAG.open = true; L("✗ hall_ready 超时"); window.__result.err = 'hall_ready timeout'; return; }
+  L("✓ 机器已 init（ready=1，等待约 " + (readyAt * 0.25).toFixed(1) + "s）");
+  if (!has('hall_frame_capture')) { DIAG.open = true; L("✗ 无 hall_frame_capture 导出"); window.__result.err = 'no frame exports'; return; }
+  document.getElementById('phase').textContent = '运行中';
+  document.getElementById('lamp').className = 'lamp on';
+
+  // ===== 出画循环：capture → 离屏 320×240 → 旋转 drawImage → 240×320 =====
+  let img = null, draws = 0, fpsT = performance.now(), fpsN = 0;
+  function drawFrame() {
+    let n = -9;
+    try { n = M._hall_frame_capture(); } catch (e) { n = -9; }
+    const S = window.__frameStats;
+    S.lastRet = n;
+    if (n > 0) {
+      const w = M._hall_frame_w(), h = M._hall_frame_h(), ptr = M._hall_frame_ptr();
+      S.w = w; S.h = h; S.fn = M._hall_frame_number();
+      if (off.width !== w || off.height !== h) { off.width = w; off.height = h; }
+      if (cv.width !== 240 || cv.height !== 320) { cv.width = 240; cv.height = 320; }
+      if (!img || img.width !== w || img.height !== h) img = offCtx.createImageData(w, h);
+      img.data.set(M.HEAPU8.subarray(ptr, ptr + w * h * 4));
+      offCtx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      if (ROT === 'ccw') { ctx.translate(0, 320); ctx.rotate(-Math.PI / 2); }
+      else { ctx.translate(240, 0); ctx.rotate(Math.PI / 2); }
+      ctx.drawImage(off, 0, 0);
+      ctx.restore();
+      draws++; fpsN++; S.draws = draws;
+      document.getElementById('hfn').textContent = S.fn;
+      const now = performance.now();
+      if (now - fpsT >= 1000) {
+        S.fps = Math.round(fpsN * 1000 / (now - fpsT)); fpsN = 0; fpsT = now;
+        document.getElementById('hfps').textContent = S.fps;
+        let nb = 0; const cs = new Set();
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 16) {
+          const r = d[i], g = d[i+1], b = d[i+2];
+          if (r || g || b) nb++;
+          cs.add((r << 16) | (g << 8) | b);
+        }
+        S.nonBlack = nb / (d.length / 16); S.colors = cs.size;
+      }
+    }
+    requestAnimationFrame(drawFrame);
+  }
+  requestAnimationFrame(drawFrame);
+
+  // ===== 状态轮询 =====
+  let lastCredit = -1;
+  setInterval(() => {
+    try {
+      const cr = M._hall_coin_count();
+      document.getElementById('hcr').textContent = cr;
+      if (cr !== lastCredit) {
+        if (lastCredit >= 0 && cr > lastCredit) {
+          const led = document.getElementById('ledCr');
+          led.classList.remove('flash'); void led.offsetWidth; led.classList.add('flash');
+        }
+        lastCredit = cr;
+      }
+      const p1 = M._hall_input(P1);
+      document.getElementById('hp1').textContent = p1 < 0 ? '?' : '0x' + p1.toString(16).padStart(2, '0');
+    } catch (e) {}
+  }, 200);
+
+  // ===== 按钮 =====
+  document.getElementById('bCoin').onclick = () => { pulse(SYS, M_COIN, 120); L("投币（SYSTEM 0x08）"); };
+  document.getElementById('bStart').onclick = () => { pulse(SYS, M_START, 250); L("开始（SYSTEM 0x20）"); };
+
+  // 按住类：射击/炸弹/第三键
+  function bindHold(el, mask) {
+    const down = e => { e.preventDefault(); el.classList.add('pressed'); key(P1, mask, 1); el.setPointerCapture && e.pointerId !== undefined && el.setPointerCapture(e.pointerId); };
+    const up = e => { el.classList.remove('pressed'); key(P1, mask, 0); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('pointerleave', up);
+  }
+  bindHold(document.getElementById('bShot'), M_SHOT);
+  bindHold(document.getElementById('bBomb'), M_BOMB);
+  bindHold(document.getElementById('bBtn3'), M_BTN3);
+
+  // 方向盘（含斜向）
+  document.querySelectorAll('.dp[data-d]').forEach(el => {
+    const mask = Number(el.dataset.d);
+    const down = e => { e.preventDefault(); el.classList.add('pressed'); dirBits(mask, 1); el.setPointerCapture && e.pointerId !== undefined && el.setPointerCapture(e.pointerId); };
+    const up = e => { el.classList.remove('pressed'); dirBits(mask, 0); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('pointerleave', up);
+  });
+
+  // ===== 键盘（辅助）=====
+  const KEYMAP = {
+    'arrowup': M_UP, 'w': M_UP, 'arrowdown': M_DOWN, 's': M_DOWN,
+    'arrowleft': M_LEFT, 'a': M_LEFT, 'arrowright': M_RIGHT, 'd': M_RIGHT,
+    'z': M_SHOT, 'j': M_SHOT, 'x': M_BOMB, 'k': M_BOMB, 'c': M_BTN3, 'l': M_BTN3
+  };
+  const held = new Set();
+  window.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k === '5') { pulse(SYS, M_COIN, 120); e.preventDefault(); return; }
+    if (k === 'enter') { pulse(SYS, M_START, 250); e.preventDefault(); return; }
+    const mask = KEYMAP[k];
+    if (mask && !held.has(k)) { held.add(k); key(P1, mask, 1); e.preventDefault(); }
+  });
+  window.addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    const mask = KEYMAP[k];
+    if (mask && held.has(k)) { held.delete(k); key(P1, mask, 0); e.preventDefault(); }
+  });
+  window.addEventListener('blur', () => {
+    held.clear();
+    for (const b of [M_UP, M_DOWN, M_LEFT, M_RIGHT, M_SHOT, M_BOMB, M_BTN3]) key(P1, b, 0);
+    document.querySelectorAll('.pressed').forEach(el => el.classList.remove('pressed'));
+  });
+
+  document.querySelectorAll('.ab,.dp[data-d]').forEach(b => b.disabled = false);
+  window.__result.ok = true;
+  window.__result.data = { readyAt, args: Mod.arguments, rot: ROT };
+  L("就绪：点「币」→「开」，方向+射击即可玩");
+ } catch (e) {
+  window.__result.err = String(e && e.stack || e);
+  DIAG.open = true;
+  L("✗ " + window.__result.err);
+ }
+})();
+</script>
+</body></html>
