@@ -1,0 +1,143 @@
+name: build-outzone-wasm
+
+# Out Zone (Toaplan toaplan1) 专用构建：与 build-wasm.yml（lhzb2/igs017）同配方，
+# 只换 SUBTARGET/SOURCES/补丁脚本。产物 tag 独立序列 outzone-wasm-N，不与 wasm-N 混。
+# 补丁 hall/apply_outzone_api.py：rgb32 帧捕获（outzone 屏是 rgb32，不是 ind16）。
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'hall/apply_outzone_api.py'
+      - '.github/workflows/build-outzone-wasm.yml'
+
+env:
+  MAME_VER: mame0289
+  SUBTARGET: outzone
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - name: Checkout (hall patch)
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Setup emsdk 5.0.7
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          cd "$RUNNER_TEMP/emsdk"
+          ./emsdk install 5.0.7
+          ./emsdk activate 5.0.7
+
+      - name: Cache MAME source + ccache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/mame-src
+            ~/.ccache
+          key: mame-${{ env.MAME_VER }}-outzone-${{ hashFiles('hall/apply_outzone_api.py') }}
+          restore-keys: |
+            mame-${{ env.MAME_VER }}-outzone-
+            mame-${{ env.MAME_VER }}-
+
+      - name: Fetch MAME source
+        run: |
+          mkdir -p "$HOME/mame-src"
+          cd "$HOME/mame-src"
+          if [ ! -f mame/makefile ]; then
+            curl -fL --retry 3 -o mame.tar.gz "https://github.com/mamedev/mame/archive/refs/tags/${MAME_VER}.tar.gz"
+            tar xzf mame.tar.gz
+            mv "mame-${MAME_VER}" mame
+            rm mame.tar.gz
+          fi
+          test -f mame/src/mame/toaplan/toaplan1.cpp
+
+      - name: Apply hall api patch (toaplan1 + sound diag)
+        run: |
+          cd "$HOME/mame-src/mame"
+          cp src/mame/toaplan/toaplan1.cpp src/mame/toaplan/toaplan1.cpp.orig
+          cp src/osd/modules/sound/js_sound.cpp src/osd/modules/sound/js_sound.cpp.orig
+          cp src/emu/sound.cpp src/emu/sound.cpp.orig
+          python3 "$GITHUB_WORKSPACE/hall/apply_outzone_api.py"
+          echo "===== toaplan1.cpp diff ====="
+          diff -u src/mame/toaplan/toaplan1.cpp.orig src/mame/toaplan/toaplan1.cpp || true
+          echo "===== js_sound.cpp diff ====="
+          diff -u src/osd/modules/sound/js_sound.cpp.orig src/osd/modules/sound/js_sound.cpp || true
+          echo "===== sound.cpp diff ====="
+          diff -u src/emu/sound.cpp.orig src/emu/sound.cpp || true
+
+      - name: Build (emmake, single driver toaplan1.cpp)
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          emcc --version
+          cd "$HOME/mame-src/mame"
+          mkdir -p "$HOME/.ccache"
+          export CCACHE_DIR="$HOME/.ccache"
+          export CCACHE_MAXSIZE=5G
+          ccache -M 5G || true
+          ccache -s || true
+          # 与 lhzb2 跑通配方完全一致（EMCC_CFLAGS 不改）
+          export EMCC_CFLAGS="-sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sUSE_SDL_TTF=2 -sSDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]' -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=4GB -sINITIAL_MEMORY=256MB -sSTACK_SIZE=1MB -sFORCE_FILESYSTEM=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain,ccall,cwrap,UTF8ToString,stringToUTF8,lengthBytesUTF8,getValue,setValue -sEXPORTED_FUNCTIONS=_main,_malloc,_free -sMODULARIZE=0 -sEXIT_RUNTIME=0 -sINVOKE_RUN=1 -sENVIRONMENT=web -sMIN_WEBGL_VERSION=1 -sMAX_WEBGL_VERSION=1 -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sFULL_ES2=1 -sFULL_ES3=1 -sGL_ASSERTIONS=1 -sGL_DEBUG=1"
+          emmake make -j"$(nproc)" \
+            TARGETOS=emscripten \
+            SUBTARGET=${SUBTARGET} \
+            SOURCES=src/mame/toaplan/toaplan1.cpp \
+            USE_SYSTEM_LIB_ASIO=1 \
+            USE_SYSTEM_LIB_EXPAT=1 \
+            USE_SYSTEM_LIB_ZLIB=1 \
+            USE_SYSTEM_LIB_JPEG=1 \
+            USE_SYSTEM_LIB_FLAC=1 \
+            USE_SYSTEM_LIB_GLM=1 \
+            USE_SYSTEM_LIB_RAPIDJSON=1 \
+            USE_SYSTEM_LIB_UTF8PROC=1 \
+            USE_SYSTEM_LIB_LINENOISE=1 \
+            USE_SYSTEM_LIB_PORTAUDIO=1 \
+            USE_SYSTEM_LIB_PORTMIDI=1 \
+            USE_SYSTEM_LIB_PUGIXML=1 \
+            USE_SYSTEM_LIB_SQLITE3=1 \
+            USE_SYSTEM_LIB_ZSTD=1 \
+            NOWERROR=1 \
+            OPTIMIZE=2 \
+            IGNORE_GIT=1 \
+            VERBOSE=1 \
+            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          ccache -s || true
+          ls -la ${SUBTARGET}.js ${SUBTARGET}.wasm
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: outzone-build-log
+          path: build.log
+          retention-days: 14
+
+      - name: Upload wasm artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: outzone-wasm
+          path: |
+            ${{ env.HOME }}/mame-src/mame/outzone.js
+            ${{ env.HOME }}/mame-src/mame/outzone.wasm
+          retention-days: 30
+
+      - name: Publish to Release (browser-downloadable)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "$HOME/mame-src/mame"
+          tar czf "$GITHUB_WORKSPACE/outzone-wasm.tar.gz" outzone.js outzone.wasm
+          cd "$GITHUB_WORKSPACE"
+          TAG="outzone-wasm-${{ github.run_number }}"
+          gh release create "$TAG" outzone-wasm.tar.gz outzone.js outzone.wasm \
+            --title "Out Zone wasm (toaplan1, hall api rgb32) #${{ github.run_number }}" \
+            --notes "自动构建：MAME ${MAME_VER} / SUBTARGET=outzone / SOURCES=toaplan1.cpp / hall api（rgb32 帧捕获）。浏览器直接下载 outzone.js + outzone.wasm 即可。" \
+            --latest=false
