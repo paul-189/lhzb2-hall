@@ -190,7 +190,7 @@ int cps_state::hall_frame_capture()
 		for (int x = 0; x < w; x++)
 		{
 			rgb_t c = m_palette->pen_color(row[x]);
-			out[x] = 0xff000000u | (u32(c.r()) << 16) | (u32(c.g()) << 8) | u32(c.b());
+			out[x] = 0xff000000u | (u32(c.b()) << 16) | (u32(c.g()) << 8) | u32(c.r());   // 小端→RGBA 字节序（同 outzone）
 		}
 	}
 	s_frame_w = w; s_frame_h = h;
