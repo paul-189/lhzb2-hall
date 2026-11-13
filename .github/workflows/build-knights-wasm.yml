@@ -61,7 +61,7 @@ jobs:
 
       - name: 编译 wasm 核心（只含 cps1 这一族驱动）
         env:
-          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument -Wno-ignored-pragmas"
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=268435456 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument -Wno-ignored-pragmas"
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
