@@ -44,6 +44,12 @@ public:
 	{
 		const ioport_list &list = machine().ioport().ports();
 		auto it = list.find(tag);
+		if (it == list.end())
+		{
+			// 0.289 实测：根设备端口键带 ":" 前缀（:P1/:SYSTEM…，hall_port_tag 转储证实），补查一次
+			const std::string full = std::string(":") + tag;
+			it = list.find(full);
+		}
 		return (it != list.end()) ? it->second.get() : nullptr;
 	}
 	// port: 0=P1  1=P2  2=SYSTEM；mask=字段掩码；val=字段逻辑值(0/1)
@@ -126,44 +132,6 @@ EMSCRIPTEN_KEEPALIVE u32 hall_frame_ptr() { return (u32)(uintptr_t)toaplan1_stat
 EMSCRIPTEN_KEEPALIVE int hall_frame_w() { return toaplan1_state::s_frame_w; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_h() { return toaplan1_state::s_frame_h; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_number() { return toaplan1_state::s_hall ? (int)toaplan1_state::s_hall->hall_frame_number() : -1; }
-
-// ---- 运行时诊断（临时，定位 hall_find_port 失败）----
-EMSCRIPTEN_KEEPALIVE int hall_port_count()
-{
-	if (!toaplan1_state::s_hall) return -1;
-	return (int)toaplan1_state::s_hall->machine().ioport().ports().size();
-}
-EMSCRIPTEN_KEEPALIVE int hall_port_find(int which)
-{
-	if (!toaplan1_state::s_hall) return -1;
-	static const char *names[] = { "P1", "P2", "SYSTEM", "VBLANK", "DSWA", "DSWB" };
-	if (which < 0 || which > 5) return -2;
-	const ioport_list &list = toaplan1_state::s_hall->machine().ioport().ports();
-	auto it1 = list.find(names[which]);                 // const char* 透明查找
-	auto it2 = list.find(std::string(names[which]));    // std::string 查找
-	int r = (it1 != list.end()) ? 1 : 0;
-	r |= ((it2 != list.end()) ? 1 : 0) << 2;
-	return r;   // bit0=char*命中 bit2=string命中
-}
-EMSCRIPTEN_KEEPALIVE int hall_port_tag(int index)
-{
-	if (!toaplan1_state::s_hall) return -1;
-	const ioport_list &list = toaplan1_state::s_hall->machine().ioport().ports();
-	int i = 0;
-	for (const auto &kv : list)
-	{
-		if (i++ == index)
-		{
-			const std::string &tag = kv.first;
-			int n = (int)tag.size(); if (n > 60) n = 60;
-			char *out = (char *)toaplan1_state::s_frame_buf;
-			for (int k = 0; k < n; k++) out[k] = tag[k];
-			out[n] = 0;
-			return n;
-		}
-	}
-	return -2;
-}
 }
 // ===== hall api end =====
 """
