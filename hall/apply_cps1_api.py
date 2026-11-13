@@ -207,8 +207,8 @@ EMSCRIPTEN_KEEPALIVE int hall_input(int port) { return cps_state::s_hall ? cps_s
 EMSCRIPTEN_KEEPALIVE int hall_coin_count() { return cps_state::s_hall ? cps_state::s_hall->hall_coin_count() : -1; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_capture() { return cps_state::s_hall ? cps_state::s_hall->hall_frame_capture() : -1; }
 EMSCRIPTEN_KEEPALIVE u32 hall_frame_ptr() { return (u32)(uintptr_t)cps_state::s_frame_buf; }
-EMSCRIPTEN_KEEPALIVE int hall_frame_w() { return cps_state::s_frame_w; }
-EMSCRIPTEN_KEEPALIVE int hall_frame_h() { return cps_state::s_frame_h; }
+EMSCRIPTEN_KEEPALIVE int hall_frame_w() { return cps_state::s_hall ? cps_state::s_hall->m_screen->visible_area().width() : 0; }
+EMSCRIPTEN_KEEPALIVE int hall_frame_h() { return cps_state::s_hall ? cps_state::s_hall->m_screen->visible_area().height() : 0; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_number() { return cps_state::s_hall ? (int)cps_state::s_hall->hall_frame_number() : -1; }
 }
 // ===== hall api end =====
