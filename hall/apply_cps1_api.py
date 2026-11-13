@@ -189,7 +189,7 @@ int cps_state::hall_frame_capture()
 		u32 *out = s_frame_buf + y * w;
 		for (int x = 0; x < w; x++)
 		{
-			rgb_t c = m_palette->pen_to_color(row[x]);
+			rgb_t c = m_palette->pen_color(row[x]);
 			out[x] = 0xff000000u | (u32(c.r()) << 16) | (u32(c.g()) << 8) | u32(c.b());
 		}
 	}
