@@ -1,0 +1,90 @@
+name: build-knights-wasm
+
+# 官方 MAME 0.289 + Knights of the Round 厅用接口补丁（cps1.h + cps1.cpp + 声音诊断）
+# 配方与 build-outzone-wasm.yml 逐字一致，只换 SUBTARGET/SOURCES/补丁脚本/tag。
+# CPS1 差异：ind16 位图→palette→RGBA、384x224 横屏、IN0/IN1/IN2 端口。
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "hall/apply_cps1_api.py"
+      - ".github/workflows/build-knights-wasm.yml"
+
+permissions:
+  contents: write
+
+env:
+  MAME_VER: mame0289
+  SUBTARGET: knights
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 取 MAME ${{ env.MAME_VER }} 源码
+        run: |
+          set -e
+          curl -sSL "https://codeload.github.com/mamedev/mame/tar.gz/refs/tags/${MAME_VER}" -o mame.tar.gz
+          mkdir -p mame && tar -xzf mame.tar.gz -C mame --strip-components=1
+          test -f mame/src/mame/capcom/cps1.cpp
+          test -f mame/src/mame/capcom/cps1.h
+
+      - name: 打厅用接口补丁（锚点不对就当场失败，绝不静默改坏）
+        run: |
+          set -e
+          cp mame/src/mame/capcom/cps1.cpp mame/src/mame/capcom/cps1.cpp.orig
+          cp mame/src/mame/capcom/cps1.h mame/src/mame/capcom/cps1.h.orig
+          cd mame
+          python3 ../hall/apply_cps1_api.py
+          diff -u src/mame/capcom/cps1.h.orig src/mame/capcom/cps1.h | head -80 || true
+          diff -u src/mame/capcom/cps1.cpp.orig src/mame/capcom/cps1.cpp | head -80 || true
+
+      - name: 装 Emscripten（官方要求 6.0.2+）
+        run: |
+          set -e
+          sudo apt-get update && sudo apt-get install -y ninja-build python3
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          cd "$HOME/emsdk"
+          ./emsdk install 6.0.2
+          ./emsdk activate 6.0.2
+
+      - name: 准备 SDL3 依赖
+        run: |
+          set -e
+          source "$HOME/emsdk/emsdk_env.sh"
+          cd "$HOME/emsdk"
+          embuilder build sdl3 sdl3_ttf
+
+      - name: 编译 wasm 核心（只含 cps1 这一族驱动）
+        env:
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument"
+        run: |
+          set -e
+          source "$HOME/emsdk/emsdk_env.sh"
+          echo "EMCC_CFLAGS=$EMCC_CFLAGS"
+          cd mame
+          emmake make SUBTARGET=${SUBTARGET} \
+            SOURCES=src/mame/capcom/cps1.cpp \
+            -j"$(nproc)" O=emscripten
+
+      - name: 收集产物
+        run: |
+          set -e
+          mkdir -p out
+          find mame -maxdepth 4 \( -name "${SUBTARGET}.js" -o -name "${SUBTARGET}.wasm" \) | tee list.txt
+          test -s list.txt || { echo "找不到产物"; find mame -name "*.wasm" | head -20; exit 1; }
+          while read -r f; do cp "$f" out/; done < list.txt
+          ls -la out
+          tar -czf "${SUBTARGET}-wasm.tar.gz" -C out .
+
+      - name: 发布 Release 资产
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: knights-wasm-${{ github.run_number }}
+          name: knights wasm build ${{ github.run_number }}
+          files: ${{ env.SUBTARGET }}-wasm.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
