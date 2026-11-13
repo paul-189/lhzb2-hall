@@ -24,18 +24,24 @@ A1 = ("\tstatic int s_frame_w, s_frame_h;\n"
 H1 = ("\tstatic int s_frame_w, s_frame_h;\n"
 """
 \t// 拨码读写：idx 0..2 → DSW1..DSW3；mask 定位字段；val = 字段原始值（mask 内）
+\t// set_value 只改 pending 值，DIP 字段不会被 frame_update 同步到 live
+\t// （ioport_field::frame_update 仅走 digital/seq/toggle 路径）——官方应用 cfg 时
+\t// 就是直写 field.live().value（ioport.cpp:2602），此处照抄同一动作。
 \tbool hall_dip(int idx, u32 mask, u32 val)
 \t{
 \t\tif (idx < 0 || idx >= 3 || !m_io_dsw[idx]) return false;
 \t\tioport_field *f = m_io_dsw[idx]->field(mask);
 \t\tif (!f) return false;
 \t\tf->set_value(val);
+\t\tf->live().value = (f->live().value & ~f->mask()) | ((ioport_value)val & f->mask());
 \t\treturn true;
 \t}
-\tint hall_dip_get(int idx, u32 mask)   // 存在性探针：字段在=1，不在/无口=-1
+\tint hall_dip_get(int idx, u32 mask)   // 读回 live 原始值（mask 内）；无口/无字段=-1
 \t{
 \t\tif (idx < 0 || idx >= 3 || !m_io_dsw[idx]) return -1;
-\t\treturn m_io_dsw[idx]->field(mask) ? 1 : -1;
+\t\tioport_field *f = m_io_dsw[idx]->field(mask);
+\t\tif (!f) return -1;
+\t\treturn int(f->live().value & f->mask());
 \t}
 \t// ===== hall api end =====""")
 
