@@ -73,6 +73,30 @@ public:
 		ioport_port *p = hall_find_port(names[port]);
 		return p ? int(p->read()) : -1;
 	}
+	// 统一难度拨码写入：照官方应用 cfg 直写 live（ioport.cpp:2602）；
+	// set_value 只改 pending，DIP 字段同步不进 live（v12 实证）。
+	bool hall_dip(int idx, u32 mask, u32 val)
+	{
+		static const char *const s_dsw[] = { "DSWA", "DSWB", "DSWC" };
+		if (idx < 0 || idx > 2) return false;
+		ioport_port *p = hall_find_port(s_dsw[idx]);
+		if (!p) return false;
+		ioport_field *f = p->field(mask);
+		if (!f) return false;
+		f->set_value(val);
+		f->live().value = (f->live().value & ~f->mask()) | ((ioport_value)val & f->mask());
+		return true;
+	}
+	int hall_dip_get(int idx, u32 mask)
+	{
+		static const char *const s_dsw[] = { "DSWA", "DSWB", "DSWC" };
+		if (idx < 0 || idx > 2) return -1;
+		ioport_port *p = hall_find_port(s_dsw[idx]);
+		if (!p) return -1;
+		ioport_field *f = p->field(mask);
+		if (!f) return -1;
+		return int(f->live().value & f->mask());
+	}
 	int hall_coin_count() { return machine().bookkeeping().coin_counter_get_count(0); }
 	static cps_state *s_hall;
 	int hall_frame_capture();
@@ -205,6 +229,8 @@ EMSCRIPTEN_KEEPALIVE int hall_ready() { return cps_state::s_hall ? 1 : 0; }
 EMSCRIPTEN_KEEPALIVE int hall_key(int port, int mask, int val) { return (cps_state::s_hall && cps_state::s_hall->hall_field(port, (u16)mask, val)) ? 0 : -1; }
 EMSCRIPTEN_KEEPALIVE int hall_input(int port) { return cps_state::s_hall ? cps_state::s_hall->hall_input(port) : -1; }
 EMSCRIPTEN_KEEPALIVE int hall_coin_count() { return cps_state::s_hall ? cps_state::s_hall->hall_coin_count() : -1; }
+EMSCRIPTEN_KEEPALIVE int hall_dip(int idx, int mask, int val) { return (cps_state::s_hall && cps_state::s_hall->hall_dip(idx, (u32)mask, (u32)val)) ? 0 : -1; }
+EMSCRIPTEN_KEEPALIVE int hall_dip_get(int idx, int mask) { return cps_state::s_hall ? cps_state::s_hall->hall_dip_get(idx, (u32)mask) : -1; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_capture() { return cps_state::s_hall ? cps_state::s_hall->hall_frame_capture() : -1; }
 EMSCRIPTEN_KEEPALIVE u32 hall_frame_ptr() { return (u32)(uintptr_t)cps_state::s_frame_buf; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_w() { return cps_state::s_hall ? cps_state::s_hall->m_screen->visible_area().width() : 0; }
