@@ -131,6 +131,27 @@ INS2 = ("MACHINE_START_MEMBER(cps_state,cps1)\n"
         "}")
 t = t.replace(A2, INS2, 1)
 
+# --- A3: MACHINE_START_MEMBER(cps_state,qsound)（QSound 机台 dino/punisher/wof 走此 start）---
+# qsound config 在 MACHINE_CONFIG 里用 MCFG_MACHINE_START_OVERRIDE(cps_state,qsound) 覆盖了 cps1 start，
+# 故 dino/punisher/wof 不走 A2，s_hall 从未赋值 → hall_ready=0。此处同款注入两行。
+A3 = ("MACHINE_START_MEMBER(cps_state,qsound)\n"
+      "{\n"
+      "\tm_audiobank->configure_entries(0, 6, memregion(\"audiocpu\")->base() + 0x10000, 0x4000);\n"
+      "}")
+n = t.count(A3)
+if n != 1:
+    print("FATAL: cps1.cpp 锚点 A3(qsound) 命中 %d 次（期望 1）" % n)
+    sys.exit(2)
+
+INS3 = ("MACHINE_START_MEMBER(cps_state,qsound)\n"
+        "{\n"
+        "\ts_hall = this;   // hall api\n"
+        "\tm_screen->set_video_attributes(VIDEO_UPDATE_BEFORE_VBLANK | VIDEO_ALWAYS_UPDATE);\n"
+        "\tm_audiobank->configure_entries(0, 6, memregion(\"audiocpu\")->base() + 0x10000, 0x4000);\n"
+        "}")
+t = t.replace(A3, INS3, 1)
+print("OK cps1.cpp: A3(qsound) 注入 s_hall（dino/punisher/wof）")
+
 # --- ROM 修正：knights audiocpu 改 64K 直载（限定在 knights 块内）---
 OLD_AUDIO = ('ROM_LOAD( "kr_09.11a",  0x00000, 0x08000, CRC(5e44d9ee) SHA1(47a7503321be8d52b5c44af838e3bb82ee15a415) )\n'
              '\tROM_CONTINUE(           0x10000, 0x08000 )')
