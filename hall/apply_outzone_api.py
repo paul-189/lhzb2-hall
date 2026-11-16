@@ -153,6 +153,11 @@ EMSCRIPTEN_KEEPALIVE int hall_input(int port) { return toaplan1_state::s_hall ? 
 EMSCRIPTEN_KEEPALIVE int hall_coin_count() { return toaplan1_state::s_hall ? toaplan1_state::s_hall->hall_coin_count() : -1; }
 EMSCRIPTEN_KEEPALIVE int hall_dip(int idx, int mask, int val) { return (toaplan1_state::s_hall && toaplan1_state::s_hall->hall_dip(idx, (u32)mask, (u32)val)) ? 0 : -1; }
 EMSCRIPTEN_KEEPALIVE int hall_dip_get(int idx, int mask) { return toaplan1_state::s_hall ? toaplan1_state::s_hall->hall_dip_get(idx, (u32)mask) : -1; }
+// 难度时序修复（2026-11-16）：写 DIP 后软复位让 CPU 重读（MAME 改 DIP 后按 F3 同机制）。
+// 根因：start_all_devices(MACHINE_START/ready=1, machine.cpp:284) 早于 load_settings(376)，后者经 ioport.cpp:2602
+// 把 DSW live 重设回出厂 defvalue ⇒ MACHINE_START 预写必被抹；CPU 在 soft_reset(395) 开机读 DIP=Normal 并锁存，
+// 壳 post-ready 补写只改端口、游戏不重读。soft_reset(1033) 不重跑 load_settings ⇒ DIP live 跨复位保持，软复位后 CPU 重读即生效。
+EMSCRIPTEN_KEEPALIVE int hall_reset() { if (toaplan1_state::s_hall) { toaplan1_state::s_hall->machine().schedule_soft_reset(); return 1; } return 0; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_capture() { return toaplan1_state::s_hall ? toaplan1_state::s_hall->hall_frame_capture() : -1; }
 EMSCRIPTEN_KEEPALIVE u32 hall_frame_ptr() { return (u32)(uintptr_t)toaplan1_state::s_frame_buf; }
 EMSCRIPTEN_KEEPALIVE int hall_frame_w() { return toaplan1_state::s_frame_w; }
