@@ -76,7 +76,7 @@ int dynax_state::s_frame_h = 0;
 
 int dynax_state::hall_frame_capture()
 {
-\tif (!m_screen.found() || !m_palette.found()) return -1;
+\tif (!m_screen.found()) return -1;
 \tscreen_bitmap &cb = m_screen->curbitmap();
 \tif (cb.format() != BITMAP_FORMAT_IND16) return -2;
 \tbitmap_ind16 &bm = cb.as_ind16();
