@@ -27,9 +27,19 @@ public:
 	// bank<0 → COIN 口；bank 0..4 → KEY0..KEY4；mask 定位字段；val 为字段逻辑值
 	bool hall_field(int bank, u8 mask, s32 val)
 	{
+		// bank<0：COIN 口同 mask 可挂多个 PORT_CONDITION 条件字段（COIN1 与 Key In 共用 0x01，
+		// 由 DSW2 bit4 切换激活）。field(mask) 只返第一个、会落到失活字段；改遍历同 mask 全字段都写值，
+		// 激活者生效、失活者被 MAME 屏蔽 → Coin/Key-In 两模式通用。（2026-11-17 投币提速）
+		if (bank < 0)
+		{
+			if (!m_io_coin) return false;
+			bool any = false;
+			for (ioport_field &f : m_io_coin->fields())
+				if (f.mask() == mask) { f.set_value(val); any = true; }
+			return any;
+		}
 		ioport_field *f = nullptr;
-		if (bank < 0)      { if (m_io_coin)     f = m_io_coin->field(mask); }
-		else if (bank < 5) { if (m_io_key[bank]) f = m_io_key[bank]->field(mask); }
+		if (bank < 5) { if (m_io_key[bank]) f = m_io_key[bank]->field(mask); }
 		if (!f) return false;
 		f->set_value(val);
 		return true;
@@ -122,9 +132,9 @@ EMSCRIPTEN_KEEPALIVE int hall_key(int bank, int mask, int val)
 {
 	return (igs011_oki_state::s_hall && igs011_oki_state::s_hall->hall_field(bank, (u8)mask, val)) ? 0 : -1;
 }
-// 机台关键量：信用 0x100066（投3币 0->3 实证）；押分/状态字待游戏页标定，先占位 0
+// 机台关键量：活信用 0x100dbc（cal4 实证：投5币=5，开局押分 5->4 递减；0x100d72/0x1010c2 是总投币不递减）；押分/状态字待游戏页标定，先占位 0
 EMSCRIPTEN_KEEPALIVE int hall_state_word() { return 0; }
-EMSCRIPTEN_KEEPALIVE int hall_credit()     { return igs011_oki_state::s_hall ? igs011_oki_state::s_hall->hall_ram16(0x100066) : -1; }
+EMSCRIPTEN_KEEPALIVE int hall_credit()     { return igs011_oki_state::s_hall ? igs011_oki_state::s_hall->hall_ram16(0x100dbc) : -1; }
 EMSCRIPTEN_KEEPALIVE int hall_bet_level()  { return 0; }
 // A 路帧导出：JS 每帧调 capture，再用 ptr/w/h 从 HEAPU8 取 RGBA 画到 canvas
 EMSCRIPTEN_KEEPALIVE int hall_frame_capture() { return igs011_oki_state::s_hall ? igs011_oki_state::s_hall->hall_frame_capture() : -1; }
