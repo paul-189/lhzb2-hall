@@ -80,15 +80,19 @@ H2 = ("void igs011_oki_state::init_lhb2cpgs()\n{\n"
       "\tm_screen->set_video_attributes(VIDEO_ALWAYS_UPDATE);   // -video none 下位图仍每帧更新\n"
       "\tlhb3_decrypt();")
 
-# ---- 2b) 奖分小游戏保护检查补全（2026-11-17，修连庄2次后第3次进小游戏黑屏）----
-# 原 init_lhb2cpgs 仅 6 处 ROM 补丁，MAME 自注 "possibly incomplete"（上游 TODO 列 lhb2cpgs
-# parametric bitswap 未实现）。解密 ROM 扫保护签名 move.w $100de0,d1; cmp.w d1,d0; beq 得 13 处：
-# 6 已知(beq.s 6736→6036)＋7 未补(beq.w 6700)，7 处聚集 0x50e0e-0x51a74(奖分小游戏子程序)，
-# fall-through=pea 错误串($19b2a/$19b52/$19b7a/$19ba2/$19bca/$19bf2/$19c1a)+clr -(sp)x2+jsr 错误处理→黑屏。
-# 修法与上游同：beq.w(6700)→bra.w(6000)，位移字 00d2 不动，强制跳错误处理(检查恒过)。
+# ---- 2b) 奖分小游戏保护补全（2026-11-17 报错型 7 处；2026-11-18 确诊黑屏真因＝填色陷阱 2 处）----
+# 【作废】2026-11-17 曾判「7 处 beq.w 保护检查失败→错误处理→黑屏」并补 0x6000；用户线上实测
+#   连庄2次后第3把仍黑 ⇒ 该 7 处只是 CHECK PORT ERROR 报错路（fall-through=pea 错误串+jsr），
+#   非黑屏根因。保留（强制跳过报错路，无害），黑屏真因另在下方 2 处填色陷阱。
+# 【真因·2026-11-18 反汇编实锤】整块调色板填色陷阱：保护检查失败→pea $800; jsr $314a(取保护值);
+#   addi.l #$210000,d0; jsr $d96 把调色板 RAM(0x210000-0x210fff)填黑→牌桌全黑(HUD 是 DOM 叠层仍在)。
+#   全 ROM 按 pea $800 穷举共 8 处填色陷阱：上游已补 6(0x2807a/2cd98/31444/32b7e/34e88/3f144，即 A3 上方)，
+#   剩 2 处在奖分小游戏代码区未补：0x4e9a2 cmp.b $208003(IGS003 动态保护 reg03) / 0x4fbe6 cmp.w -(a6)。
+#   MAME 的 IGS003 parametric bitswap 未实现→保护值算错→cmp 失败→填黑。修法与上游 6 处同构：
+#   beq.b→bra.b 恒跳过填色（6736→6036 / 6734→6034）。无 $211000(ext) 陷阱；其余 jsr $314a 为 pea $200/$100 正常局部写。
 A3 = "\trom[0x3f144 / 2] = 0x6036;\n}"
 H3 = ("\trom[0x3f144 / 2] = 0x6036;\n"
-      "\t// 奖分小游戏保护补全（7 处未补检查，beq.w→bra.w 保位移；详见上方注释）\n"
+      "\t// 报错型保护检查 7 处（beq.w→bra.w 保位移 00d2）：跳过 CHECK PORT ERROR 报错路，非黑屏根因，保留无害\n"
       "\trom[0x50e0e / 2] = 0x6000;\n"
       "\trom[0x50fdc / 2] = 0x6000;\n"
       "\trom[0x51232 / 2] = 0x6000;\n"
@@ -96,6 +100,9 @@ H3 = ("\trom[0x3f144 / 2] = 0x6036;\n"
       "\trom[0x516c6 / 2] = 0x6000;\n"
       "\trom[0x518d0 / 2] = 0x6000;\n"
       "\trom[0x51a74 / 2] = 0x6000;\n"
+      "\t// ★黑屏真因：整块调色板填色陷阱 2 处（beq.b→bra.b 恒跳过填色；详见上方注释，2026-11-18）\n"
+      "\trom[0x4e9a2 / 2] = 0x6036;   // was 6736 beq.b +0x36 -> 04e9da (cmp.b $208003 IGS003动态保护)\n"
+      "\trom[0x4fbe6 / 2] = 0x6034;   // was 6734 beq.b +0x34 -> 04fc1c (cmp.w -(a6))\n"
       "}")
 
 # ---- 3) 文件末尾：导出给 JS 的 C 接口 ----
