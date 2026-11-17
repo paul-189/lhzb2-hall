@@ -80,6 +80,24 @@ H2 = ("void igs011_oki_state::init_lhb2cpgs()\n{\n"
       "\tm_screen->set_video_attributes(VIDEO_ALWAYS_UPDATE);   // -video none 下位图仍每帧更新\n"
       "\tlhb3_decrypt();")
 
+# ---- 2b) 奖分小游戏保护检查补全（2026-11-17，修连庄2次后第3次进小游戏黑屏）----
+# 原 init_lhb2cpgs 仅 6 处 ROM 补丁，MAME 自注 "possibly incomplete"（上游 TODO 列 lhb2cpgs
+# parametric bitswap 未实现）。解密 ROM 扫保护签名 move.w $100de0,d1; cmp.w d1,d0; beq 得 13 处：
+# 6 已知(beq.s 6736→6036)＋7 未补(beq.w 6700)，7 处聚集 0x50e0e-0x51a74(奖分小游戏子程序)，
+# fall-through=pea 错误串($19b2a/$19b52/$19b7a/$19ba2/$19bca/$19bf2/$19c1a)+clr -(sp)x2+jsr 错误处理→黑屏。
+# 修法与上游同：beq.w(6700)→bra.w(6000)，位移字 00d2 不动，强制跳错误处理(检查恒过)。
+A3 = "\trom[0x3f144 / 2] = 0x6036;\n}"
+H3 = ("\trom[0x3f144 / 2] = 0x6036;\n"
+      "\t// 奖分小游戏保护补全（7 处未补检查，beq.w→bra.w 保位移；详见上方注释）\n"
+      "\trom[0x50e0e / 2] = 0x6000;\n"
+      "\trom[0x50fdc / 2] = 0x6000;\n"
+      "\trom[0x51232 / 2] = 0x6000;\n"
+      "\trom[0x51460 / 2] = 0x6000;\n"
+      "\trom[0x516c6 / 2] = 0x6000;\n"
+      "\trom[0x518d0 / 2] = 0x6000;\n"
+      "\trom[0x51a74 / 2] = 0x6000;\n"
+      "}")
+
 # ---- 3) 文件末尾：导出给 JS 的 C 接口 ----
 TAIL = """
 
@@ -150,7 +168,7 @@ EMSCRIPTEN_KEEPALIVE int hall_dip_get(int idx, int mask)
 // ===== hall api end =====
 """
 
-for name, a in (("锚1 m_io_key 成员", A1), ("锚2 init_lhb2cpgs 头部", A2)):
+for name, a in (("锚1 m_io_key 成员", A1), ("锚2 init_lhb2cpgs 头部", A2), ("锚3 init_lhb2cpgs 末补丁", A3)):
     if src.count(a) != 1:
         print("FAIL: %s 命中 %d 次（必须正好 1 次）" % (name, src.count(a))); sys.exit(2)
 
@@ -161,6 +179,7 @@ for need in ("optional_ioport m_io_coin;", "optional_ioport_array<5> m_io_key;",
 
 src = src.replace(A1, HALL_METHODS, 1)
 src = src.replace(A2, H2, 1)
+src = src.replace(A3, H3, 1)
 src += TAIL
 io.open(PATH, "w", encoding="utf-8").write(src)
 print("OK: lhb2 hall 补丁已应用 %d -> %d 字节（+%d）" % (len(orig), len(src), len(src) - len(orig)))
