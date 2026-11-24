@@ -31,5 +31,14 @@ EMSCRIPTEN_KEEPALIVE int rb_load(void){ if(!bDrvOkay) return 0; return BurnState
 EMSCRIPTEN_KEEPALIVE int rb_input_count(void){ if(!bDrvOkay) return 0; int n=0; struct BurnInputInfo bii; while(BurnDrvGetInputInfo(&bii,n)==0) n++; return n; }
 EMSCRIPTEN_KEEPALIVE const char* rb_input_name(int i){ static struct BurnInputInfo bii; if(BurnDrvGetInputInfo(&bii,i)!=0) return ""; return bii.szName?bii.szName:""; }
 EMSCRIPTEN_KEEPALIVE int rb_set_input(int i,int v){ struct BurnInputInfo bii; if(BurnDrvGetInputInfo(&bii,i)!=0) return 0; if(!bii.pVal) return 0; *bii.pVal=(unsigned char)(v?1:0); return 1; }
+
+// ---- 同步单帧（rollback-netcode Game.step 用，同步非ASYNCIFY）----
+// 直调 BurnDrvFrame：它读驱动输入锁存（rb_set_input 已写），不调 InputMake（ burner 实时轮询），
+// 复用 boot 设好的 pBurnDraw/pBurnSoundOut。一帧确定性单元（R2 已证 RunFrame 确定）。
+EMSCRIPTEN_KEEPALIVE void rb_tick(void)
+{
+	if (!bDrvOkay) return;
+	BurnDrvFrame();
+}
 } // extern "C"
 #endif
