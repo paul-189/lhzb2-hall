@@ -38,7 +38,6 @@ EMSCRIPTEN_KEEPALIVE int rb_set_input(int i,int v){ struct BurnInputInfo bii; if
 EMSCRIPTEN_KEEPALIVE void rb_tick(void)
 {
 	if (!bDrvOkay) return;
-	pBurnDraw = pVidImage;   // 画到视频缓冲（供 rb_render 刷屏）
 	BurnDrvFrame();
 }
 // 刷屏（把 pVidImage blit 到 canvas）。回滚重算时不调，仅最终显示帧调。
