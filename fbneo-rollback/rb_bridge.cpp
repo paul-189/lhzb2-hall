@@ -38,6 +38,7 @@ EMSCRIPTEN_KEEPALIVE int rb_set_input(int i,int v){ struct BurnInputInfo bii; if
 EMSCRIPTEN_KEEPALIVE void rb_tick(void)
 {
 	if (!bDrvOkay) return;
+	pBurnSoundOut = nAudNextSound;   // 声音写进 SDL 环形缓冲（否则 pBurnSoundOut=NULL 静音）
 	BurnDrvFrame();
 }
 // 帧缓冲直读（绕 VidPaint 的 GL，headless 下 GL 刷屏越界）。JS 读 HEAPU8 转 RGBA 画 2D canvas。
