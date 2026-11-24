@@ -20,6 +20,7 @@ int bRbStepMode = 0;       // 1=手动步进（回滚）；0=自走 pacing
 int nRbStepFrames = 0;     // 待推进帧数；循环每跑一帧减 1
 int nRbFrameCount = 0;     // 自 init 累计推进帧（双方同步基准）
 extern "C" {
+static INT16 g_rb_audio[32768];  // 帧声音缓冲（同 libretro g_audio_buf）
 EMSCRIPTEN_KEEPALIVE int rb_max_players(void){ if(!bDrvOkay) return 0; return BurnDrvGetMaxPlayers(); }
 EMSCRIPTEN_KEEPALIVE const char* rb_driver_name(void){ if(!bDrvOkay) return ""; return BurnDrvGetText(DRV_NAME); }
 EMSCRIPTEN_KEEPALIVE int rb_frame_count(void){ return nRbFrameCount; }
@@ -38,7 +39,7 @@ EMSCRIPTEN_KEEPALIVE int rb_set_input(int i,int v){ struct BurnInputInfo bii; if
 EMSCRIPTEN_KEEPALIVE void rb_tick(void)
 {
 	if (!bDrvOkay) return;
-	pBurnSoundOut = nAudNextSound;   // 声音写进 SDL 环形缓冲（否则 pBurnSoundOut=NULL 静音）
+	pBurnSoundOut = g_rb_audio;   // 声音写进静态缓冲（否则 NULL 静音）
 	BurnDrvFrame();
 }
 // 帧缓冲直读（绕 VidPaint 的 GL，headless 下 GL 刷屏越界）。JS 读 HEAPU8 转 RGBA 画 2D canvas。
@@ -49,7 +50,7 @@ EMSCRIPTEN_KEEPALIVE INT32 rb_viddepth(void){ return nVidDepth; }
 // 渲染开关：回滚重算时 off（pBurnDraw=NULL 跳视频，快）；显示帧 on。
 EMSCRIPTEN_KEEPALIVE void rb_setrender(int on){ pBurnDraw = on ? pVidImage : (UINT8*)0; }
 // 声音缓冲直读（帧钟同步喂 Web Audio）。pBurnSoundOut 每帧 nAudNextSound 字节 16bit 立体声。
-EMSCRIPTEN_KEEPALIVE INT32 rb_soundbuf(void){ void* p=(void*)pBurnSoundOut; return (INT32)(uintptr_t)p; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_soundbuf(void){ void* p=(void*)g_rb_audio; return (INT32)(uintptr_t)p; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_soundlen(void){ return nBurnSoundLen; }  // 样本/帧（立体声16bit→字节×4）
 EMSCRIPTEN_KEEPALIVE INT32 rb_soundrate(void){ return nBurnSoundRate; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_audnext(void){ void* p=(void*)nAudNextSound; return (INT32)(uintptr_t)p; }
