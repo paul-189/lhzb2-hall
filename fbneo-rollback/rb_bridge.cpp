@@ -40,11 +40,11 @@ EMSCRIPTEN_KEEPALIVE void rb_tick(void)
 	if (!bDrvOkay) return;
 	BurnDrvFrame();
 }
-// 刷屏（把 pVidImage blit 到 canvas）。回滚重算时不调，仅最终显示帧调。
-EMSCRIPTEN_KEEPALIVE void rb_render(void)
-{
-	if (!bDrvOkay) return;
-	VidPaint(0);
-}
+// 帧缓冲直读（绕 VidPaint 的 GL，headless 下 GL 刷屏越界）。JS 读 HEAPU8 转 RGBA 画 2D canvas。
+EMSCRIPTEN_KEEPALIVE INT32 rb_framebuf(void){ return (INT32)(uintptr_t)pVidImage; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_vidwidth(void){ return nVidWidth; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_vidheight(void){ return nVidHeight; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_viddepth(void){ return nVidDepth; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_vidpitch(void){ return nVidPitch; }
 } // extern "C"
 #endif
