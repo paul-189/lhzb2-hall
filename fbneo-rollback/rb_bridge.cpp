@@ -48,9 +48,8 @@ EMSCRIPTEN_KEEPALIVE INT32 rb_viddepth(void){ return nVidDepth; }
 // 渲染开关：回滚重算时 off（pBurnDraw=NULL 跳视频，快）；显示帧 on。
 EMSCRIPTEN_KEEPALIVE void rb_setrender(int on){ pBurnDraw = on ? pVidImage : (UINT8*)0; }
 // 声音缓冲直读（帧钟同步喂 Web Audio）。pBurnSoundOut 每帧 nAudNextSound 字节 16bit 立体声。
-extern INT32 nAudNextSound;
 EMSCRIPTEN_KEEPALIVE INT32 rb_soundbuf(void){ void* p=(void*)pBurnSoundOut; return (INT32)(uintptr_t)p; }
-EMSCRIPTEN_KEEPALIVE INT32 rb_soundlen(void){ return nAudNextSound; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_soundlen(void){ return nBurnSoundLen; }  // 样本/帧（立体声16bit→字节×4）
 EMSCRIPTEN_KEEPALIVE INT32 rb_soundrate(void){ return nBurnSoundRate; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_drvwidth(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return w; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_drvheight(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return h; }
