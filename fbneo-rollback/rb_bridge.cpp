@@ -38,7 +38,6 @@ EMSCRIPTEN_KEEPALIVE int rb_set_input(int i,int v){ struct BurnInputInfo bii; if
 EMSCRIPTEN_KEEPALIVE void rb_tick(void)
 {
 	if (!bDrvOkay) return;
-	pBurnDraw = pVidImage;   // 让 BurnDrvFrame 画进 pVidImage（供 JS 直读）
 	BurnDrvFrame();
 }
 // 帧缓冲直读（绕 VidPaint 的 GL，headless 下 GL 刷屏越界）。JS 读 HEAPU8 转 RGBA 画 2D canvas。
@@ -46,6 +45,8 @@ EMSCRIPTEN_KEEPALIVE INT32 rb_framebuf(void){ return (INT32)(uintptr_t)pVidImage
 EMSCRIPTEN_KEEPALIVE INT32 rb_vidwidth(void){ return nVidWidth; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_vidheight(void){ return nVidHeight; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_viddepth(void){ return nVidDepth; }
+// 渲染开关：回滚重算时 off（pBurnDraw=NULL 跳视频，快）；显示帧 on。
+EMSCRIPTEN_KEEPALIVE void rb_setrender(int on){ pBurnDraw = on ? pVidImage : (UINT8*)0; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_drvwidth(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return w; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_drvheight(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return h; }
 
