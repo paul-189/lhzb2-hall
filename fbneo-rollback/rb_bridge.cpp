@@ -51,6 +51,8 @@ EMSCRIPTEN_KEEPALIVE void rb_setrender(int on){ pBurnDraw = on ? pVidImage : (UI
 EMSCRIPTEN_KEEPALIVE INT32 rb_soundbuf(void){ void* p=(void*)pBurnSoundOut; return (INT32)(uintptr_t)p; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_soundlen(void){ return nBurnSoundLen; }  // 样本/帧（立体声16bit→字节×4）
 EMSCRIPTEN_KEEPALIVE INT32 rb_soundrate(void){ return nBurnSoundRate; }
+extern INT16* nAudNextSound;
+EMSCRIPTEN_KEEPALIVE INT32 rb_audnext(void){ void* p=(void*)nAudNextSound; return (INT32)(uintptr_t)p; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_drvwidth(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return w; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_drvheight(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return h; }
 
