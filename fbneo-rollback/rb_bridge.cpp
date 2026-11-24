@@ -38,6 +38,7 @@ EMSCRIPTEN_KEEPALIVE int rb_set_input(int i,int v){ struct BurnInputInfo bii; if
 EMSCRIPTEN_KEEPALIVE void rb_tick(void)
 {
 	if (!bDrvOkay) return;
+	pBurnDraw = pVidImage;   // 让 BurnDrvFrame 画进 pVidImage（供 JS 直读）
 	BurnDrvFrame();
 }
 // 帧缓冲直读（绕 VidPaint 的 GL，headless 下 GL 刷屏越界）。JS 读 HEAPU8 转 RGBA 画 2D canvas。
