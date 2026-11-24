@@ -35,10 +35,20 @@ EMSCRIPTEN_KEEPALIVE int rb_set_input(int i,int v){ struct BurnInputInfo bii; if
 // ---- 同步单帧（rollback-netcode Game.step 用，同步非ASYNCIFY）----
 // 直调 BurnDrvFrame：它读驱动输入锁存（rb_set_input 已写），不调 InputMake（ burner 实时轮询），
 // 复用 boot 设好的 pBurnDraw/pBurnSoundOut。一帧确定性单元（R2 已证 RunFrame 确定）。
+extern UINT8* pVidImage;
+extern UINT8* pBurnDraw;
+extern INT32 VidPaint(INT32 bRedraw);
 EMSCRIPTEN_KEEPALIVE void rb_tick(void)
 {
 	if (!bDrvOkay) return;
+	pBurnDraw = pVidImage;   // 画到视频缓冲（供 rb_render 刷屏）
 	BurnDrvFrame();
+}
+// 刷屏（把 pVidImage blit 到 canvas）。回滚重算时不调，仅最终显示帧调。
+EMSCRIPTEN_KEEPALIVE void rb_render(void)
+{
+	if (!bDrvOkay) return;
+	VidPaint(0);
 }
 } // extern "C"
 #endif
