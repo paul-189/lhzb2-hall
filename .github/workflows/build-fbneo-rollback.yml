@@ -1,0 +1,72 @@
+name: build-fbneo-rollback-wasm
+
+# FBNeo 回滚核心（R1）：SDL2 burner + Emscripten + rb_bridge（手动逐帧/快照/输入/原生人数）。
+# fork 自 wasm-gaming/fbneo-wasm build-fbneo.sh，pin FBNeo commit。产物 fbneo.js + fbneo.wasm。
+# 与 MAME 线（build-knights-wasm.yml）同仓复用 emsdk；FBNeo 用 SDL2（非 SDL3）。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FBNEO_REV: d7179fef1397e9fcf337ca0a79562b094ff60cba
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 装 Emscripten 6.0.2 + 原生工具链
+        run: |
+          set -e
+          sudo apt-get update && sudo apt-get install -y ninja-build python3 build-essential
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          cd "$HOME/emsdk"
+          ./emsdk install 6.0.2
+          ./emsdk activate 6.0.2
+
+      - name: 准备 SDL2 依赖（FBNeo burner 用 SDL2/SDL2_image）
+        run: |
+          set -e
+          source "$HOME/emsdk/emsdk_env.sh"
+          cd "$HOME/emsdk"
+          embuilder build sdl2 sdl2_image
+
+      - name: 布置构建脚本（scripts/ 下，PROJECT_DIR=仓根）
+        run: |
+          set -e
+          mkdir -p scripts
+          cp fbneo-rollback/build-fbneo-rollback.sh scripts/build-fbneo-rollback.sh
+          curl -sSL "https://raw.githubusercontent.com/wasm-gaming/fbneo-wasm/main/scripts/web_bridge.cpp" -o scripts/web_bridge.cpp
+          test -s scripts/web_bridge.cpp
+          cp fbneo-rollback/rb_bridge.cpp scripts/rb_bridge.cpp
+          chmod +x scripts/build-fbneo-rollback.sh
+
+      - name: 编译 FBNeo 回滚 wasm（长编译）
+        run: |
+          set -e
+          source "$HOME/emsdk/emsdk_env.sh"
+          export FBNEO_REV="${FBNEO_REV}"
+          bash scripts/build-fbneo-rollback.sh
+
+      - name: 收集产物
+        run: |
+          set -e
+          mkdir -p out
+          test -s dist/fbneo/fbneo.js
+          test -s dist/fbneo/fbneo.wasm
+          cp dist/fbneo/fbneo.js dist/fbneo/fbneo.wasm out/
+          ls -la out
+          tar -czf fbneo-rollback-wasm.tar.gz -C out .
+
+      - name: 发布 Release 资产
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: fbneo-rollback-wasm-${{ github.run_number }}
+          name: FBNeo rollback wasm build ${{ github.run_number }}
+          files: fbneo-rollback-wasm.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
