@@ -45,6 +45,5 @@ EMSCRIPTEN_KEEPALIVE INT32 rb_framebuf(void){ return (INT32)(uintptr_t)pVidImage
 EMSCRIPTEN_KEEPALIVE INT32 rb_vidwidth(void){ return nVidWidth; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_vidheight(void){ return nVidHeight; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_viddepth(void){ return nVidDepth; }
-EMSCRIPTEN_KEEPALIVE INT32 rb_vidpitch(void){ return nVidPitch; }
 } // extern "C"
 #endif
