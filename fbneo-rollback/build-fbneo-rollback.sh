@@ -143,7 +143,7 @@ pace = (
     '\t\textern int nRbStepFrames;\n'
     '\t\textern int nRbFrameCount;\n'
     '\t\tif (bRbStepMode) {\n'
-    '\t\t\tif (nRbStepFrames > 0) { RunIdle(); nRbStepFrames--; nRbFrameCount++; }\n'
+    '\t\t\tif (nRbStepFrames > 0) { RunFrame(1, 0); nRbStepFrames--; nRbFrameCount++; }\n'
     '\t\t\temscripten_sleep(0);\n'
     '\t\t} else if (!bWebPaused)\n'
     '#endif\n'
