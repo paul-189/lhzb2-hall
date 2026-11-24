@@ -46,5 +46,8 @@ EMSCRIPTEN_KEEPALIVE INT32 rb_framebuf(void){ return (INT32)(uintptr_t)pVidImage
 EMSCRIPTEN_KEEPALIVE INT32 rb_vidwidth(void){ return nVidWidth; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_vidheight(void){ return nVidHeight; }
 EMSCRIPTEN_KEEPALIVE INT32 rb_viddepth(void){ return nVidDepth; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_drvwidth(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return w; }
+EMSCRIPTEN_KEEPALIVE INT32 rb_drvheight(void){ INT32 w=0,h=0; BurnDrvGetVisibleSize(&w,&h); return h; }
+
 } // extern "C"
 #endif
