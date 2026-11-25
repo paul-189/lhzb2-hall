@@ -170,7 +170,7 @@ pace = (
 s = must(s, '\twhile (!quit)\n', '#ifdef __EMSCRIPTEN__\n'
 '\t/* R5.13 web mode: the loop runs ONLY until the ROM is loaded (the load is\n'
 '\t   deferred into it via bAppDoLoad), then exits — no self-driving frames,\n'
-'\t   no emscripten_sleep, no ASYNCIFY (WebKit #304810 leaks invisibly on iOS\n'
+'\t   no sleep trampolines, no ASYNCIFY (WebKit #304810 leaks invisibly\n'
 '\t   and jetsam-kills the page ~100s). JS drives every frame via rb_tick().\n'
 '\t   nWebBootSpins is a hard fuse against a load that neither sets bDrvOkay\n'
 '\t   nor asks to quit. */\n'
@@ -381,7 +381,7 @@ must_contain src/intf/video/sdl/vid_sdl2.cpp 'zero-GL: no present' 'vid_sdl2 Pai
 must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL headless' 'vid_sdl2opengl headless Init'
 must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL: no present' 'vid_sdl2opengl Paint guard'
 must_lack src/burner/sdl/run.cpp 'emscripten_sleep' 'no asyncify-dependent sleep calls (R5.13)'
-must_lack src/burner/sdl/run.cpp 'RunIdle();\n\n\t}' 'pace block not injected'
+must_lack src/burner/sdl/run.cpp 'nextFrameMs' 'pace block not injected'
 
 fi
 
