@@ -168,11 +168,18 @@ pace = (
 # ASYNCIFY, which leaks memory inside WebKit (bugs.webkit.org #304810).
 # The SDK's destroy() ends the loop (scripts/web_bridge.cpp: web_quit).
 s = must(s, '\twhile (!quit)\n', '#ifdef __EMSCRIPTEN__\n'
-'\t/* R5.13 web mode: the self-driving loop NEVER runs — JS drives every\n'
-'\t   frame through rb_tick(). Keeping it alive would force ASYNCIFY, and\n'
-'\t   ASYNCIFY + unaligned i64 leaks memory invisibly in WebKit\n'
-'\t   (bugs.webkit.org #304810) -> iOS jetsam-kills the page ~100s. */\n'
-'\tif (0)\n#endif\n\twhile (!quit)\n', 1)
+'\t/* R5.13 web mode: the loop runs ONLY until the ROM is loaded (the load is\n'
+'\t   deferred into it via bAppDoLoad), then exits — no self-driving frames,\n'
+'\t   no emscripten_sleep, no ASYNCIFY (WebKit #304810 leaks invisibly on iOS\n'
+'\t   and jetsam-kills the page ~100s). JS drives every frame via rb_tick().\n'
+'\t   nWebBootSpins is a hard fuse against a load that neither sets bDrvOkay\n'
+'\t   nor asks to quit. */\n'
+'\tint nWebBootSpins = 0;\n'
+'\textern int bDrvOkay;\n'
+'\twhile (!quit && !bDrvOkay && nWebBootSpins++ < 10000000)\n'
+'#else\n'
+'\twhile (!quit)\n'
+'#endif\n', 1)
 # R5.13: after the (dead) loop, web mode must NOT tear the machine down —
 # JS drives rb_tick() against the live loaded game for the whole session.
 s = must(s, '\tRunExit();\n\n\treturn 0;', '#ifdef __EMSCRIPTEN__\n\t/* web mode: keep the machine alive; destroy() tears down via web bridge. */\n\treturn 0;\n#endif\n\tRunExit();\n\n\treturn 0;', 1)
