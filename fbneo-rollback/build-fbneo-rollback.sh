@@ -88,6 +88,8 @@ sed -i 's/^LD\s*=\s*\$(CC)/LD = em++/' makefile.sdl2
 sed -i 's/`sdl2-config --cflags`/-sUSE_SDL=2 -sUSE_SDL_IMAGE=2/g' makefile.sdl2
 sed -i 's/`sdl2-config --libs`/-sUSE_SDL=2 -sUSE_SDL_IMAGE=2/g' makefile.sdl2
 sed -i 's/-lGL //g; s/-lopengl32 //g; s/-lSDL2_image //g; s/-lpthread//g' makefile.sdl2
+sed -i 's/vid_sdl2opengl\.o //g' makefile.sdl2
+must_lack makefile.sdl2 'vid_sdl2opengl.o' 'unlink SDL2-OpenGL video plugin (zero-GL)'
 must_contain makefile.sdl2 'CC = emcc' 'CC → emcc'
 must_contain makefile.sdl2 'CXX = em++' 'CXX → em++'
 must_contain makefile.sdl2 'LD = em++' 'LD → em++'
@@ -306,12 +308,50 @@ cat "$PROJECT_DIR/scripts/web_bridge.cpp" >> src/burner/sdl/main.cpp
 cat "$PROJECT_DIR/scripts/rb_bridge.cpp" >> src/burner/sdl/main.cpp
 must_contain src/burner/sdl/main.cpp 'EMSCRIPTEN_KEEPALIVE void web_set_paused' 'web bridge'
 must_contain src/burner/sdl/main.cpp 'EMSCRIPTEN_KEEPALIVE int rb_max_players' 'rb bridge'
+# 13. zero-GL: vid_sdl2 video plugin runs headless — no window/renderer/texture
+#     (they would create a WebGL context on Emscripten; the page only reads
+#     pVidImage and blits in 2D, so GL presentation is pure overhead + iOS risk).
+if [ "${FBNEO_INCREMENTAL:-}" != "1" ] || ! grep -q 'zero-GL headless' src/intf/video/sdl/vid_sdl2.cpp; then
+echo "Patching vid_sdl2.cpp for zero-GL headless..."
+python3 - <<'PYEOF4'
+p='src/intf/video/sdl/vid_sdl2.cpp'
+s=open(p,encoding='utf-8',errors='replace').read()
+head='#ifdef __EMSCRIPTEN__\n'
+head+='\t/* zero-GL headless: no window/renderer/texture; page reads pVidImage directly */\n'
+head+='\t{\n'
+head+='\t\tconst int depth = (BurnDrvGetFlags() & BDF_16BIT_ONLY) ? 16 : 32;\n'
+head+='\t\tnVidImageDepth = depth;\n'
+head+='\t\tnVidImageBPP = (depth + 7) >> 3;\n'
+head+='\t\tnBurnBpp = nVidImageBPP;\n'
+head+='\t\tSetBurnHighCol(depth);\n'
+head+='\t\tnVidImagePitch = nVidImageWidth * nVidImageBPP;\n'
+head+='\t\tnBurnPitch = nVidImagePitch;\n'
+head+='\t\tconst int memLen = nVidImageWidth * nVidImageHeight * nVidImageBPP;\n'
+head+='\t\tVidMem = (unsigned char*)malloc(memLen);\n'
+head+='\t\tif (!VidMem) return 1;\n'
+head+='\t\tmemset(VidMem, 0, memLen);\n'
+head+='\t\tpVidImage = VidMem;\n'
+head+='\t\treturn 0;\n'
+head+='\t}\n'
+head+='#endif\n\n'
+old='\tsprintf(Windowtitle, "FBNeo - %s - %s", BurnDrvGetTextA(DRV_NAME), BurnDrvGetTextA(DRV_FULLNAME));'
+assert s.count(old)==1, 'patch not applied: Windowtitle anchor'
+s=s.replace(old, head+old)
+old2='static int Paint(int bValidate)\n{\n'
+assert s.count(old2)==1, 'patch not applied: Paint anchor'
+s=s.replace(old2, 'static int Paint(int bValidate)\n{\n#ifdef __EMSCRIPTEN__\n\treturn 0;  /* zero-GL: no present */\n#endif\n')
+open(p,'w').write(s)
+PYEOF4
+must_contain src/intf/video/sdl/vid_sdl2.cpp 'zero-GL headless' 'vid_sdl2 headless Init'
+must_contain src/intf/video/sdl/vid_sdl2.cpp 'zero-GL: no present' 'vid_sdl2 Paint guard'
+fi
+
 fi  # end patch block (skipped when reusing an already-patched incremental tree)
 
 # Emscripten link flags: an ES module factory (createFbneoModule, imported by the SDK)
 # exporting FS/callMain, so the SDK can write ROM zips into MEMFS and boot a driver by
-# name, and the bridge's functions. LEGACY_GL_EMULATION
-# lets the desktop-GL video path (vid_sdl2opengl) resolve against WebGL; ASYNCIFY
+# name, and the bridge's functions. Zero-GL (R5.12): vid_sdl2opengl is
+# unlinked and vid_sdl2 runs headless, so no WebGL context is ever created; ASYNCIFY
 # lets FBNeo's blocking SDL2 main loop cooperate with the browser event loop.
 EM_LDFLAGS="${EM_LDFLAGS:-\
   -sMODULARIZE=1 \
@@ -328,7 +368,6 @@ EM_LDFLAGS="${EM_LDFLAGS:-\
   -sGROWABLE_ARRAYBUFFERS=0 \
   -sUSE_SDL=2 \
   -sUSE_SDL_IMAGE=2 \
-  -sLEGACY_GL_EMULATION=1 \
   -sASYNCIFY=1}"
 
 # FBNeo is built through the ROOT makefile target `sdl2`, which runs
