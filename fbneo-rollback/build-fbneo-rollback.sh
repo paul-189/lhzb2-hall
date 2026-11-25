@@ -1,4 +1,5 @@
 # FBNeo 回滚构建（R1）— fork 自 wasm-gaming/fbneo-wasm build-fbneo.sh，加 rb_bridge＋step 模式＋rb_* 导出。
+# R5.13：去 ASYNCIFY（WebKit #304810 iOS 隐形漏内存~100s杀页）；web 模式主循环 if(0) 死化，帧全由 JS rb_tick 同步驱动。
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -162,9 +163,19 @@ pace = (
     '\t\t}\n'
     '#endif\n\n\t}'
 )
-s = must(s, '\t\tRunIdle();\n\n\t}', pace, 1)
+# R5.13: pace/sleep injection REMOVED — the web build no longer runs the
+# self-driving loop at all (see below), and emscripten_sleep would demand
+# ASYNCIFY, which leaks memory inside WebKit (bugs.webkit.org #304810).
 # The SDK's destroy() ends the loop (scripts/web_bridge.cpp: web_quit).
-s = must(s, '\twhile (!quit)\n', '#ifdef __EMSCRIPTEN__\n\textern int bWebQuit;\n\twhile (!quit && !bWebQuit)\n#else\n\twhile (!quit)\n#endif\n', 1)
+s = must(s, '\twhile (!quit)\n', '#ifdef __EMSCRIPTEN__\n'
+'\t/* R5.13 web mode: the self-driving loop NEVER runs — JS drives every\n'
+'\t   frame through rb_tick(). Keeping it alive would force ASYNCIFY, and\n'
+'\t   ASYNCIFY + unaligned i64 leaks memory invisibly in WebKit\n'
+'\t   (bugs.webkit.org #304810) -> iOS jetsam-kills the page ~100s. */\n'
+'\tif (0)\n#endif\n\twhile (!quit)\n', 1)
+# R5.13: after the (dead) loop, web mode must NOT tear the machine down —
+# JS drives rb_tick() against the live loaded game for the whole session.
+s = must(s, '\tRunExit();\n\n\treturn 0;', '#ifdef __EMSCRIPTEN__\n\t/* web mode: keep the machine alive; destroy() tears down via web bridge. */\n\treturn 0;\n#endif\n\tRunExit();\n\n\treturn 0;', 1)
 s = must(s, 
 '''					case SDL_WINDOWEVENT_MINIMIZED:
 					case SDL_WINDOWEVENT_FOCUS_LOST:
@@ -362,6 +373,8 @@ must_contain src/intf/video/sdl/vid_sdl2.cpp 'zero-GL headless' 'vid_sdl2 headle
 must_contain src/intf/video/sdl/vid_sdl2.cpp 'zero-GL: no present' 'vid_sdl2 Paint guard'
 must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL headless' 'vid_sdl2opengl headless Init'
 must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL: no present' 'vid_sdl2opengl Paint guard'
+must_lack src/burner/sdl/run.cpp 'emscripten_sleep' 'no asyncify-dependent sleep calls (R5.13)'
+must_lack src/burner/sdl/run.cpp 'RunIdle();\n\n\t}' 'pace block not injected'
 
 fi
 
@@ -389,7 +402,7 @@ EM_LDFLAGS="${EM_LDFLAGS:-\
   -sUSE_SDL=2 \
   -sUSE_SDL_IMAGE=2 \
   -sLEGACY_GL_EMULATION=1 \
-  -sASYNCIFY=1}"
+ }"
 
 # FBNeo is built through the ROOT makefile target `sdl2`, which runs
 # `$(MAKE) -f makefile.sdl2`. That nesting is required: makefile.sdl2 uses
