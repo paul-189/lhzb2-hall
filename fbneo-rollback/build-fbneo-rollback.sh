@@ -209,6 +209,28 @@ s = must(s,
 open(p, 'w').write(s)
 PYEOF
 
+# 11b. R5.13: DoGame() in main.cpp tears the machine down right after
+#      RunMessageLoop() returns. With the web loop dead, that would unload the
+#      game immediately — guard it. Teardown belongs to the web bridge destroy().
+python3 - <<'PYEOF4B'
+p = 'src/burner/sdl/main.cpp'
+s = open(p).read()
+if 'R5.13 web mode: keep the machine loaded' not in s:
+    old = '\tDrvExit();\n\tMediaExit();\n}'
+    assert s.count(old) == 1, 'DoGame tail not unique'
+    s = s.replace(old,
+        '#ifdef __EMSCRIPTEN__\n'
+        '\t/* R5.13 web mode: keep the machine loaded — JS drives frames via rb_tick().\n'
+        '\t   Teardown is the web bridge destroy()\'s job, not this return path. */\n'
+        '\treturn;\n'
+        '#endif\n'
+        + old)
+    open(p, 'w').write(s)
+    print('main.cpp: DoGame tail guarded')
+else:
+    print('main.cpp: already patched')
+PYEOF4B
+
 # 10. Audio: the browser AudioContext is natively 32-bit float at (typically)
 #     48000Hz, but FBNeo requests S16/44100. SDL either (a) hands the callback an
 #     F32 buffer while our ring buffer is S16 — the play position then advances by
@@ -382,6 +404,7 @@ must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL headless' 'vid_sdl2o
 must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL: no present' 'vid_sdl2opengl Paint guard'
 must_lack src/burner/sdl/run.cpp 'emscripten_sleep' 'no asyncify-dependent sleep calls (R5.13)'
 must_lack src/burner/sdl/run.cpp 'nextFrameMs' 'pace block not injected'
+must_contain src/burner/sdl/main.cpp 'R5.13 web mode: keep the machine loaded' 'DoGame tail guard'
 
 fi
 
