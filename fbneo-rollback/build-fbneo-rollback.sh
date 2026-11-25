@@ -88,8 +88,6 @@ sed -i 's/^LD\s*=\s*\$(CC)/LD = em++/' makefile.sdl2
 sed -i 's/`sdl2-config --cflags`/-sUSE_SDL=2 -sUSE_SDL_IMAGE=2/g' makefile.sdl2
 sed -i 's/`sdl2-config --libs`/-sUSE_SDL=2 -sUSE_SDL_IMAGE=2/g' makefile.sdl2
 sed -i 's/-lGL //g; s/-lopengl32 //g; s/-lSDL2_image //g; s/-lpthread//g' makefile.sdl2
-sed -i 's/vid_sdl2opengl\.o //g' makefile.sdl2
-must_lack makefile.sdl2 'vid_sdl2opengl.o' 'unlink SDL2-OpenGL video plugin (zero-GL)'
 must_contain makefile.sdl2 'CC = emcc' 'CC → emcc'
 must_contain makefile.sdl2 'CXX = em++' 'CXX → em++'
 must_contain makefile.sdl2 'LD = em++' 'LD → em++'
@@ -311,47 +309,69 @@ must_contain src/burner/sdl/main.cpp 'EMSCRIPTEN_KEEPALIVE int rb_max_players' '
 # 13. zero-GL: vid_sdl2 video plugin runs headless — no window/renderer/texture
 #     (they would create a WebGL context on Emscripten; the page only reads
 #     pVidImage and blits in 2D, so GL presentation is pure overhead + iOS risk).
-if [ "${FBNEO_INCREMENTAL:-}" != "1" ] || ! grep -q 'zero-GL headless' src/intf/video/sdl/vid_sdl2.cpp; then
-echo "Patching vid_sdl2.cpp for zero-GL headless..."
+if [ "${FBNEO_INCREMENTAL:-}" != "1" ] || ! grep -q 'zero-GL headless' src/intf/video/sdl/vid_sdl2opengl.cpp; then
+echo "Patching SDL video plugins for zero-GL headless..."
 python3 - <<'PYEOF4'
-p='src/intf/video/sdl/vid_sdl2.cpp'
-s=open(p,encoding='utf-8',errors='replace').read()
-head='#ifdef __EMSCRIPTEN__\n'
-head+='\t/* zero-GL headless: no window/renderer/texture; page reads pVidImage directly */\n'
-head+='\t{\n'
-head+='\t\tconst int depth = (BurnDrvGetFlags() & BDF_16BIT_ONLY) ? 16 : 32;\n'
-head+='\t\tnVidImageDepth = depth;\n'
-head+='\t\tnVidImageBPP = (depth + 7) >> 3;\n'
-head+='\t\tnBurnBpp = nVidImageBPP;\n'
-head+='\t\tSetBurnHighCol(depth);\n'
-head+='\t\tnVidImagePitch = nVidImageWidth * nVidImageBPP;\n'
-head+='\t\tnBurnPitch = nVidImagePitch;\n'
-head+='\t\tconst int memLen = nVidImageWidth * nVidImageHeight * nVidImageBPP;\n'
-head+='\t\tVidMem = (unsigned char*)malloc(memLen);\n'
-head+='\t\tif (!VidMem) return 1;\n'
-head+='\t\tmemset(VidMem, 0, memLen);\n'
-head+='\t\tpVidImage = VidMem;\n'
-head+='\t\treturn 0;\n'
-head+='\t}\n'
-head+='#endif\n\n'
-old='\tsprintf(Windowtitle, "FBNeo - %s - %s", BurnDrvGetTextA(DRV_NAME), BurnDrvGetTextA(DRV_FULLNAME));'
-assert s.count(old)==1, 'patch not applied: Windowtitle anchor'
-s=s.replace(old, head+old)
-old2='static int Paint(int bValidate)\n{\n'
-assert s.count(old2)==1, 'patch not applied: Paint anchor'
-s=s.replace(old2, 'static int Paint(int bValidate)\n{\n#ifdef __EMSCRIPTEN__\n\treturn 0;  /* zero-GL: no present */\n#endif\n')
-open(p,'w').write(s)
+def patch(p, head_anchor, head_code):
+    s=open(p,encoding='utf-8',errors='replace').read()
+    if 'zero-GL' in s:
+        print('already patched:',p); return
+    assert s.count(head_anchor)==1, 'anchor miss in '+p
+    s=s.replace(head_anchor, head_code+head_anchor)
+    a2='static int Paint(int bValidate)\n{\n'
+    assert s.count(a2)==1, 'Paint anchor miss in '+p
+    s=s.replace(a2, a2+'#ifdef __EMSCRIPTEN__\n\treturn 0;  /* zero-GL: no present */\n#endif\n')
+    open(p,'w').write(s)
+    print('patched:',p)
+
+head2=('#ifdef __EMSCRIPTEN__\n'
+ '\t/* zero-GL headless: no window/renderer/texture; page reads pVidImage directly */\n'
+ '\t{\n'
+ '\t\tconst int depth = (BurnDrvGetFlags() & BDF_16BIT_ONLY) ? 16 : 32;\n'
+ '\t\tnVidImageDepth = depth;\n'
+ '\t\tnVidImageBPP = (depth + 7) >> 3;\n'
+ '\t\tnBurnBpp = nVidImageBPP;\n'
+ '\t\tSetBurnHighCol(depth);\n'
+ '\t\tnVidImagePitch = nVidImageWidth * nVidImageBPP;\n'
+ '\t\tnBurnPitch = nVidImagePitch;\n'
+ '\t\tconst int memLen = nVidImageWidth * nVidImageHeight * nVidImageBPP;\n'
+ '\t\tVidMem = (unsigned char*)malloc(memLen);\n'
+ '\t\tif (!VidMem) return 1;\n'
+ '\t\tmemset(VidMem, 0, memLen);\n'
+ '\t\tpVidImage = VidMem;\n'
+ '\t\treturn 0;\n'
+ '\t}\n'
+ '#endif\n\n')
+patch('src/intf/video/sdl/vid_sdl2.cpp',
+ '\tsprintf(Windowtitle, "FBNeo - %s - %s", BurnDrvGetTextA(DRV_NAME), BurnDrvGetTextA(DRV_FULLNAME));',
+ head2)
+
+headgl=('#ifdef __EMSCRIPTEN__\n'
+ '\t/* zero-GL headless: no window/GL context; keep BlitFX buffers only */\n'
+ '\t{\n'
+ '\t\tint r = BlitFXInit();\n'
+ '\t\tif (r != 0) return r;\n'
+ '\t\treturn 0;\n'
+ '\t}\n'
+ '#endif\n\n')
+patch('src/intf/video/sdl/vid_sdl2opengl.cpp',
+ '\tUint32 screenFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;',
+ headgl)
 PYEOF4
 must_contain src/intf/video/sdl/vid_sdl2.cpp 'zero-GL headless' 'vid_sdl2 headless Init'
 must_contain src/intf/video/sdl/vid_sdl2.cpp 'zero-GL: no present' 'vid_sdl2 Paint guard'
+must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL headless' 'vid_sdl2opengl headless Init'
+must_contain src/intf/video/sdl/vid_sdl2opengl.cpp 'zero-GL: no present' 'vid_sdl2opengl Paint guard'
+
 fi
 
 fi  # end patch block (skipped when reusing an already-patched incremental tree)
 
 # Emscripten link flags: an ES module factory (createFbneoModule, imported by the SDK)
 # exporting FS/callMain, so the SDK can write ROM zips into MEMFS and boot a driver by
-# name, and the bridge's functions. Zero-GL (R5.12): vid_sdl2opengl is
-# unlinked and vid_sdl2 runs headless, so no WebGL context is ever created; ASYNCIFY
+# name, and the bridge's functions. Zero-GL (R5.12): both SDL video plugins run
+# headless at runtime (no window/GL context); LEGACY_GL_EMULATION stays only so
+# the dormant gl* refs in vid_sdl2opengl.o still link; ASYNCIFY
 # lets FBNeo's blocking SDL2 main loop cooperate with the browser event loop.
 EM_LDFLAGS="${EM_LDFLAGS:-\
   -sMODULARIZE=1 \
@@ -368,6 +388,7 @@ EM_LDFLAGS="${EM_LDFLAGS:-\
   -sGROWABLE_ARRAYBUFFERS=0 \
   -sUSE_SDL=2 \
   -sUSE_SDL_IMAGE=2 \
+  -sLEGACY_GL_EMULATION=1 \
   -sASYNCIFY=1}"
 
 # FBNeo is built through the ROOT makefile target `sdl2`, which runs
