@@ -84,7 +84,7 @@ jobs:
           echo "EMCC_CFLAGS=$EMCC_CFLAGS"
           cd mame
           emmake make SUBTARGET=${SUBTARGET} \
-            SOURCES=src/mame/igs/igs017.cpp \
+            SOURCES=src/mame/igs/igs017.cpp,src/mame/igs/igs017_igs031.cpp,src/mame/igs/igs022.cpp,src/mame/igs/igsmahjong.cpp \
             -j"$(nproc)" O=emscripten
 
       - name: 收集产物
