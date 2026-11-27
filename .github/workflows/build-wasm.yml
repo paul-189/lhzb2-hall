@@ -77,7 +77,7 @@ jobs:
           # 0.284 自带 expat/bgfx 对新版 clang 有 -Wformat/-Wdeprecated 告警 ⇒ 末尾 -Wno-error 只降级不致命
           # LEGACY_GL_EMULATION：MAME 渲染器用 GL1.1 固定管线（实测链接期报 glShadeModel/glColor4f/glVertex2f
           # 未定义，页面 abort(missing function: glShadeModel)；-video soft/bgfx 都被 OSD 拒 "Unknown system"
-          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument -Wno-error"
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument -Wno-error -sEXCEPTION_CATCHING_ALLOWED=[\"_main\"] -sASSERTIONS=1"
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
