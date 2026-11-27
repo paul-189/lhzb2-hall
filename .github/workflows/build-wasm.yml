@@ -43,6 +43,14 @@ jobs:
           python3 ../hall/apply_hall_api_v14.py
           diff -u src/mame/igs/igs017.cpp.orig src/mame/igs/igs017.cpp | head -60 || true
 
+      - name: 兼容性补丁（0.284 sdlprefix × 新 emsdk）
+        run: |
+          set -e
+          F=mame/src/osd/sdl/sdlprefix.h
+          grep -q "^struct _IO_FILE {};" "$F" || { echo "锚点不在，说明上游已修或文件变了"; exit 1; }
+          sed -i "s|^struct _IO_FILE {};.*|// removed: new emscripten alltypes.h already provides _IO_FILE|" "$F"
+          echo OK
+
       - name: 装 Emscripten（官方要求 6.0.2+）
         run: |
           set -e
