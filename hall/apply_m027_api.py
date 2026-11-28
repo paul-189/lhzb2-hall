@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# v3: hall_field 改成员访问（ioport_manager::port 是私有）+ 新增 m_io_test
 # 给官方 MAME 0.289 的 src/mame/igs/igs_m027.cpp 打"厅用接口"补丁（龙虎大满贯 lhdmg / IGS027 ARM）。
 # 接口与 lhzb2 厅同名（hall_ready/ram8/16/key/frame_capture...），页面代码可直接复用。
 # RAM 直读写 m_nvram 共享指针（0x18000000.. mirror 32KB），不走总线、无副作用。
@@ -30,10 +31,7 @@ public:
 	// bank<0 → TEST 口；bank 0..4 → KEY0..KEY4；mask 定位字段；val 字段逻辑值
 	bool hall_field(int bank, u8 mask, s32 val)
 	{
-		char tag[16];
-		if (bank < 0) snprintf(tag, sizeof(tag), "TEST");
-		else snprintf(tag, sizeof(tag), "KEY%d", bank);
-		ioport_port *p = machine().ioport().port(tag);
+		ioport_port *p = (bank < 0) ? m_io_test : (bank < 5 ? m_io_kbd[bank] : nullptr);
 		if (!p) return false;
 		ioport_field *f = p->field(mask);
 		if (!f) return false;
@@ -47,6 +45,13 @@ public:
 	static u32 s_frame_buf[512 * 256];
 	static int s_frame_w, s_frame_h;
 	// ===== hall api end ====="""
+
+
+# ---- 1b) 新增 TEST 口成员（构造初始化列表 + 声明）----
+A1B = "\t\tm_io_misc(*this, \"MISC\"),"
+H1B = "\t\tm_io_test(*this, \"TEST\"),\n" + A1B
+A1C = "\toptional_ioport m_io_misc;"
+H1C = "\trequired_ioport m_io_test;\n" + A1C
 
 A2 = "void igs_m027_state::init_slqz3()\n{\n\tslqz3_decrypt(machine());"
 H2 = ("void igs_m027_state::init_slqz3()\n{\n"
@@ -125,12 +130,14 @@ EMSCRIPTEN_KEEPALIVE int hall_frame_number() { return igs_m027_state::s_hall ? i
 // ===== hall api end =====
 """
 
-for name, a in (("锚1 m_maincpu 声明", A1), ("锚2 init_slqz3", A2)):
+for name, a in (("锚1 m_maincpu 声明", A1), ("锚1b TEST初始化", A1B), ("锚1c m_io_misc声明", A1C), ("锚2 init_slqz3", A2)):
     if src.count(a) != 1:
         print("FAIL: %s 命中 %d 次（必须正好 1）" % (name, src.count(a))); sys.exit(2)
 if "hall api" in src:
     print("FAIL: 补丁疑似已应用"); sys.exit(2)
 src = src.replace(A1, H1, 1)
+src = src.replace(A1B, H1B, 1)
+src = src.replace(A1C, H1C, 1)
 src = src.replace(A2, H2, 1)
 src += TAIL
 io.open(PATH, "w", encoding="utf-8").write(src)
