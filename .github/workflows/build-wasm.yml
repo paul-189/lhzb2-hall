@@ -1,6 +1,6 @@
 name: build-lhzb2hall-wasm
 
-# 官方 MAME 0.284（与役满存档 x.sta 同版本）+ 厅用接口补丁（只改 igs017.cpp，不 fork 驱动、不加驱动文件）
+# 官方 MAME 0.289 + 厅用接口补丁（只改 igs017.cpp，不 fork 驱动、不加驱动文件）
 # 产物走 Release 资产：本机能通 api/upload/objects，但 actions.githubusercontent.com（artifact）不通。
 
 on:
@@ -11,8 +11,6 @@ on:
       - "hall/apply_hall_api_v11.py"
       - "hall/apply_hall_api_v12.py"
       - "hall/apply_hall_api_v13.py"
-      - "hall/apply_hall_api_v14.py"
-      - "hall/apply_hall_api_v15.py"
       - ".github/workflows/build-wasm.yml"
 
 permissions:
@@ -41,16 +39,8 @@ jobs:
           set -e
           cp mame/src/mame/igs/igs017.cpp mame/src/mame/igs/igs017.cpp.orig
           cd mame
-          python3 ../hall/apply_hall_api_v15.py
+          python3 ../hall/apply_hall_api_v13.py
           diff -u src/mame/igs/igs017.cpp.orig src/mame/igs/igs017.cpp | head -60 || true
-
-      - name: 兼容性补丁（0.284 sdlprefix × 新 emsdk）
-        run: |
-          set -e
-          F=mame/src/osd/sdl/sdlprefix.h
-          grep -q "^struct _IO_FILE {};" "$F" || { echo "0.289 无此行（上游已修），跳过兼容补丁"; exit 0; }
-          sed -i "s|^struct _IO_FILE {};.*|// removed: new emscripten alltypes.h already provides _IO_FILE|" "$F"
-          echo OK
 
       - name: 装 Emscripten（官方要求 6.0.2+）
         run: |
@@ -75,17 +65,16 @@ jobs:
           # =all：只加不减。上一版列白名单把 MAME 胶水自己依赖的 Module.cwrap 挤掉了
           # （页面报 "Module.cwrap is not a function"），=all 保留官方默认导出
           # 必须含 cwrap：实测胶水自己调用 Module.cwrap 13 次（=all 这版不认，白名单漏 cwrap 也会崩）
-          # 0.284 自带 expat/bgfx 对新版 clang 有 -Wformat/-Wdeprecated 告警 ⇒ 末尾 -Wno-error 只降级不致命
           # LEGACY_GL_EMULATION：MAME 渲染器用 GL1.1 固定管线（实测链接期报 glShadeModel/glColor4f/glVertex2f
           # 未定义，页面 abort(missing function: glShadeModel)；-video soft/bgfx 都被 OSD 拒 "Unknown system"
-          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument -Wno-error -sASSERTIONS=1"
+          EMCC_CFLAGS: "-sEXPORTED_RUNTIME_METHODS=FS,cwrap,ccall,callMain,HEAPU8,stackAlloc,stringToUTF8,UTF8ToString,lengthBytesUTF8,addRunDependency,removeRunDependency -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sMAX_WEBGL_VERSION=2 -Wno-unused-command-line-argument -Wno-error=unused-command-line-argument"
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
           echo "EMCC_CFLAGS=$EMCC_CFLAGS"
           cd mame
           emmake make SUBTARGET=${SUBTARGET} \
-            SOURCES=src/mame/igs/igs017.cpp,src/mame/igs/igs017_igs031.cpp,src/mame/igs/igs022.cpp,src/mame/igs/igsmahjong.cpp \
+            SOURCES=src/mame/igs/igs017.cpp \
             -j"$(nproc)" O=emscripten
 
       - name: 收集产物
