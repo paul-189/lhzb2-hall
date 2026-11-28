@@ -19,7 +19,7 @@ permissions:
   contents: write      # 发布 Release 资产需要（上一轮就是这里 403：Resource not accessible by integration）
 
 env:
-  MAME_VER: mame0284
+  MAME_VER: mame0289
   SUBTARGET: lhzb2hall
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
         run: |
           set -e
           F=mame/src/osd/sdl/sdlprefix.h
-          grep -q "^struct _IO_FILE {};" "$F" || { echo "锚点不在，说明上游已修或文件变了"; exit 1; }
+          grep -q "^struct _IO_FILE {};" "$F" || { echo "0.289 无此行（上游已修），跳过兼容补丁"; exit 0; }
           sed -i "s|^struct _IO_FILE {};.*|// removed: new emscripten alltypes.h already provides _IO_FILE|" "$F"
           echo OK
 
@@ -82,8 +82,6 @@ jobs:
         run: |
           set -e
           source "$HOME/emsdk/emsdk_env.sh"
-          # 0.284 官方只把 EXCEPTION_CATCHING_ALLOWED 放编译期、链接期缺 => 运行时抛异常必 abort（0.289 已补 linkoptions）
-          export EMCC_CFLAGS="$EMCC_CFLAGS -sEXCEPTION_CATCHING_ALLOWED=['_ZN15running_machine17start_all_devicesEv','_ZN12cli_frontend7executeEiPPc','_ZN8chd_file11open_commonEb','_ZN8chd_file13read_metadataEjjRNSt3__212basic_stringIcNS0_11char_traitsIcEENS0_9allocatorIcEEEE','_ZN8chd_file13read_metadataEjjRNSt3__26vectorIhNS0_9allocatorIhEEEE','_ZNK19netlist_mame_device19base_validity_checkER16validity_checker']"
           echo "EMCC_CFLAGS=$EMCC_CFLAGS"
           cd mame
           emmake make SUBTARGET=${SUBTARGET} \
